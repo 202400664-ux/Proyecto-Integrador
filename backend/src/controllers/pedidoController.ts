@@ -5,12 +5,12 @@ import { Proveedor } from '../models/Proveedor.js';
 // --- Configuración del horario operativo del centro de distribución ---
 const HORARIO_OPERATIVO = {
   // 0 = domingo, 1 = lunes, ..., 6 = sábado
-  1: { inicio: 6.5, fin: 17 },  // lunes: 6:30 - 17:00
-  2: { inicio: 6.5, fin: 17 },  // martes
-  3: { inicio: 6.5, fin: 17 },  // miércoles
-  4: { inicio: 6.5, fin: 17 },  // jueves
-  5: { inicio: 6.5, fin: 17 },  // viernes
-  6: { inicio: 6.5, fin: 14 },  // sábado: 6:30 - 14:00
+  1: { inicio: 6, fin: 18 },  // lunes: 6:00 - 18:00
+  2: { inicio: 6, fin: 18 },  // martes
+  3: { inicio: 6, fin: 18 },  // miércoles
+  4: { inicio: 6, fin: 18 },  // jueves
+  5: { inicio: 6, fin: 18 },  // viernes
+  6: { inicio: 6, fin: 18 },  // sábado: 6:00 - 18:00
 } as Record<number, { inicio: number; fin: number }>;
 // domingo (0) no aparece = cerrado
 
@@ -133,6 +133,17 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // La duración real entre inicioVentana y finVentana debe coincidir
+    // exactamente con duracionEstimadaMinutos — son 2 campos independientes
+    // que el usuario podría llenar de forma inconsistente.
+    const duracionRealMinutos = (fin.getTime() - inicio.getTime()) / 60000;
+    if (duracionRealMinutos !== Number(duracionEstimadaMinutos)) {
+      res.status(400).json({
+        mensaje: `La ventana (${duracionRealMinutos} min) no coincide con la duración estimada declarada (${duracionEstimadaMinutos} min)`,
+      });
+      return;
+    }
+    
     // --- RN-02a: dentro del horario operativo ---
     if (!dentroDelHorarioOperativo(inicio, fin)) {
       res.status(400).json({
@@ -141,20 +152,25 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // --- RN-02b: sin solapamiento con otro pedido ya programado ---
+   // --- RN-02b: sin solapamiento con otro pedido ya programado ---
     const pedidosDelDia = await Pedido.find({
       estado: { $ne: 'CANCELADO' },
     });
 
-    const haySolapamiento = pedidosDelDia.some((pedido) =>
+    const pedidoEnConflicto = pedidosDelDia.find((pedido) =>
       seTraslapan(inicio, fin, new Date(pedido.inicioVentana), new Date(pedido.finVentana))
     );
 
-    if (haySolapamiento) {
+    if (pedidoEnConflicto) {
       const alternativas = await generarAlternativas(inicio, duracionEstimadaMinutos);
       res.status(409).json({
         mensaje: 'La ventana solicitada se traslapa con otro pedido ya programado',
-        alternativasSugeridas: alternativas,
+        conflictoCon: {
+          numeroPedido: pedidoEnConflicto.numeroPedido,
+          inicioVentana: pedidoEnConflicto.inicioVentana,
+          finVentana: pedidoEnConflicto.finVentana,
+        },
+        ventanasAlternativas: alternativas,
       });
       return;
     }

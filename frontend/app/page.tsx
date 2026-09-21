@@ -11,11 +11,7 @@ interface DecodedToken {
   exp: number;
 }
 
-const roleDestinations: Record<DecodedToken['rol'], string> = {
-  administrador: '/dashboard/administrador',
-  coordinador: '/dashboard/coordinador',
-  operador: '/dashboard/operador',
-};
+const ROLES_VALIDOS: DecodedToken['rol'][] = ['administrador', 'coordinador', 'operador'];
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -47,18 +43,17 @@ export default function LoginPage() {
 
       // Decodificar y validar el JWT antes de persistir la sesión.
       const decoded: DecodedToken = jwtDecode(data.token);
-      if (!Object.hasOwn(roleDestinations, decoded.rol)) {
+      if (!ROLES_VALIDOS.includes(decoded.rol)) {
         throw new Error('El rol recibido no es válido');
       }
 
       localStorage.setItem('token', data.token);
-      localStorage.setItem('rol', decoded.rol);
 
-      // Redirección dinámica basada en el rol validado dentro del JWT.
-      router.replace(roleDestinations[decoded.rol]);
+      // Redirección al dashboard único: la UI se adapta por permisos según
+      // el rol decodificado del token (no hay una ruta/interfaz por rol).
+      router.replace('/dashboard');
     } catch (err: unknown) {
       localStorage.removeItem('token');
-      localStorage.removeItem('rol');
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
     } finally {
       setLoading(false);

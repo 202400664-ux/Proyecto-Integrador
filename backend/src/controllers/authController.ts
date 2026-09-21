@@ -49,15 +49,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       { expiresIn: '24h' } // Expiración exacta a 24 horas
     );
 
-    // 5. Enviar respuesta con token y rol del usuario
+    // 5. Enviar respuesta con el ÚNICO token. El rol y el resto de datos del
+    // usuario viven exclusivamente dentro del JWT (fuente única de verdad):
+    // no se duplica el rol fuera del token para evitar inconsistencias.
     res.status(200).json({
       mensaje: 'Inicio de sesión exitoso',
       token,
-      usuario: {
-        id: usuario._id,
-        email: usuario.email,
-        rol: rol.nombre
-      }
     });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error interno en el servidor', error });

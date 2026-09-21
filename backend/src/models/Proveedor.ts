@@ -1,47 +1,66 @@
-import { Schema, model, type InferSchemaType } from 'mongoose';
+import { Schema, model, Document } from 'mongoose';
 
-export type Categoria = 'construcción' | 'general';
+export type CategoriaProveedor = 'construcción' | 'general';
 
-const proveedorSchema = new Schema({
-  razonSocial: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  identificacionTributaria: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-  },
-  categoria: {
-    type: String,
-    required: true,
-    enum: ['construcción', 'general'] satisfies Categoria[],
-  },
-  contactoNombre: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  telefono: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  emailContacto: {
-    type: String,
-    required: true,
-    trim: true,
-    lowercase: true,
-    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Correo electrónico inválido'],
-  },
-  estado: {
-    type: String,
-    enum: ['activo', 'inactivo'],
-    default: 'activo',
-  },
-}, { timestamps: true });
+export interface IProveedor extends Document {
+  razonSocial: string;
+  identificacionTributaria: string;
+  categoria: CategoriaProveedor;
+  contactoNombre: string;
+  telefono: string;
+  emailContacto: string;
+  estado: 'activo' | 'inactivo';
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
-export type IProveedor = InferSchemaType<typeof proveedorSchema>;
-export const Proveedor = model('Proveedor', proveedorSchema);
+const proveedorSchema = new Schema<IProveedor>(
+  {
+    razonSocial: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/, 'La razón social solo puede contener letras'],
+    },
+    identificacionTributaria: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      match: [/^[0-9]+$/, 'La identificación tributaria solo puede contener números'],
+    },
+    categoria: {
+      type: String,
+      required: true,
+      enum: ['construcción', 'general'],
+    },
+    contactoNombre: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/, 'El nombre de contacto solo puede contener letras'],
+    },
+    telefono: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [/^\d{4}-\d{4}$/, 'El teléfono debe tener el formato ####-####'],
+    },
+    emailContacto: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Formato de correo inválido'],
+    },
+    estado: {
+      type: String,
+      enum: ['activo', 'inactivo'],
+      default: 'activo',
+      required: true,
+    },
+  },
+  { timestamps: true }
+);
+
+export const Proveedor = model<IProveedor>('Proveedor', proveedorSchema);
