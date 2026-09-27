@@ -1,6 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { registrarArribo } from '../api';
+import { obtenerNombreUsuarioActual } from '../../auth';
 
 // 1. Declarar la prop en la interfaz
 interface CasetaArribosFormProps {
@@ -21,7 +22,7 @@ export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosF
     setCargando(true);
 
     try {
-      const data = await registrarArribo(numPedido, 'Operador Caseta');
+      const data = await registrarArribo(numPedido, obtenerNombreUsuarioActual());
       setResultado(data);
       setNumPedido('');
 
