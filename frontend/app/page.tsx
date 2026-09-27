@@ -47,6 +47,7 @@ export default function LoginPage() {
         throw new Error('El rol recibido no es válido');
       }
 
+      localStorage.removeItem('rol');
       localStorage.setItem('token', data.token);
 
       // Redirección al dashboard único: la UI se adapta por permisos según
@@ -54,6 +55,7 @@ export default function LoginPage() {
       router.replace('/dashboard');
     } catch (err: unknown) {
       localStorage.removeItem('token');
+      localStorage.removeItem('rol');
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
     } finally {
       setLoading(false);

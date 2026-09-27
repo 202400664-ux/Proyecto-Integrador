@@ -13,6 +13,7 @@ interface DecodedToken {
 
 const removeStoredSession = () => {
   localStorage.removeItem('token');
+  localStorage.removeItem('rol');
 };
 
 const getRoleLabel = (role: Rol) => role.charAt(0).toUpperCase() + role.slice(1);
