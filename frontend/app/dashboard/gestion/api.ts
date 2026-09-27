@@ -1,4 +1,5 @@
 import type { Pedido, Proveedor } from './types';
+import { obtenerNombreUsuarioActual } from '../auth';
 
 export const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -52,7 +53,7 @@ export async function crearProveedor(payload: NuevoProveedorPayload): Promise<Pr
   const response = await fetch(`${API_BASE_URL}/proveedores`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, usuarioCreacion: obtenerNombreUsuarioActual() }),
   });
   const data = await parseOrThrow<{ proveedor: Proveedor }>(response);
   return data.proveedor;
@@ -62,14 +63,18 @@ export async function actualizarProveedor(id: string, payload: Partial<NuevoProv
   const response = await fetch(`${API_BASE_URL}/proveedores/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, usuarioActualizacion: obtenerNombreUsuarioActual() }),
   });
   const data = await parseOrThrow<{ proveedor: Proveedor }>(response);
   return data.proveedor;
 }
 
 export async function inactivarProveedor(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/proveedores/${id}`, { method: 'DELETE' });
+  const response = await fetch(`${API_BASE_URL}/proveedores/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuarioActualizacion: obtenerNombreUsuarioActual() }),
+  });
   await parseOrThrow(response);
 }
 
@@ -83,7 +88,7 @@ export async function crearPedido(payload: NuevoPedidoPayload): Promise<Pedido> 
   const response = await fetch(`${API_BASE_URL}/pedidos`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, usuarioCreacion: obtenerNombreUsuarioActual() }),
   });
   const data = await parseOrThrow<{ pedido: Pedido }>(response);
   return data.pedido;
@@ -93,7 +98,7 @@ export async function actualizarPedido(id: string, payload: Partial<NuevoPedidoP
   const response = await fetch(`${API_BASE_URL}/pedidos/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, usuarioActualizacion: obtenerNombreUsuarioActual() }),
   });
   const data = await parseOrThrow<{ pedido: Pedido }>(response);
   return data.pedido;
@@ -103,7 +108,7 @@ export async function cancelarPedido(id: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/pedidos/${id}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ usuarioActualizacion: 'Sistema' }),
+    body: JSON.stringify({ usuarioActualizacion: obtenerNombreUsuarioActual() }),
   });
   await parseOrThrow(response);
 }

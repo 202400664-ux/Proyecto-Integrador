@@ -1,9 +1,26 @@
-import { Schema, model, type InferSchemaType, type Types } from 'mongoose';
+import { Schema, model, type Document, type Types } from 'mongoose';
 
 export type TipoProducto = 'construcción' | 'general';
 export type EstadoPedido = 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'CANCELADO';
 
-const pedidoSchema = new Schema(
+export interface IPedido extends Document {
+  numeroPedido: string;
+  proveedorId: Types.ObjectId;
+  tipoProducto: TipoProducto;
+  fechaHoraProgramada: Date;
+  inicioVentana: Date;
+  finVentana: Date;
+  duracionEstimadaMinutos: number;
+  fechaHoraLlegadaReal?: Date;
+  estado: EstadoPedido;
+  activo: boolean;
+  usuarioCreacion: string;
+  usuarioActualizacion: string;
+  fechaCreacion?: Date;
+  fechaActualizacion?: Date;
+}
+
+const pedidoSchema = new Schema<IPedido>(
   {
     numeroPedido: {
       type: String,
@@ -67,5 +84,4 @@ const pedidoSchema = new Schema(
   }
 );
 
-export type IPedido = InferSchemaType<typeof pedidoSchema> & { proveedorId: Types.ObjectId };
-export const Pedido = model('Pedido', pedidoSchema);
+export const Pedido = model<IPedido>('Pedido', pedidoSchema);

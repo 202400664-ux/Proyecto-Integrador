@@ -20,6 +20,7 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
       contactoNombre,
       telefono,
       emailContacto,
+      usuarioCreacion,
     } = req.body;
 
     // 1. Campos obligatorios
@@ -91,6 +92,8 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
       emailContacto,
       estado: 'activo',
       activo: true,
+      usuarioCreacion: usuarioCreacion || 'Sistema',
+      usuarioActualizacion: usuarioCreacion || 'Sistema',
     });
 
     await registrarAuditoria({

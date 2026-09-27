@@ -43,8 +43,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // El nombre completo viaja en el token para que el frontend pueda
+    // registrar usuarioCreacion/usuarioActualizacion con el nombre real del
+    // usuario autenticado, sin tener que volver a consultar el backend.
+    const nombreCompleto = `${usuario.nombres} ${usuario.apellidosCompleto}`.trim();
+
     const token = jwt.sign(
-      { id: usuario._id, email: usuario.email, rol: rol.nombre },
+      { id: usuario._id, email: usuario.email, rol: rol.nombre, nombreCompleto },
       secretKey,
       { expiresIn: '24h' } // Expiración exacta a 24 horas
     );

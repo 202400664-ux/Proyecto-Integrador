@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Pedido } from '../models/Pedido.js';
 import { Proveedor } from '../models/Proveedor.js';
 import { registrarAuditoria } from './auditoriaController.js';
+import { marcarPedidosAusentes } from './llegadasController.js';
 
 // --- Configuración del horario operativo del centro de distribución ---
 const HORARIO_OPERATIVO = {
@@ -101,6 +102,7 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       inicioVentana,
       finVentana,
       duracionEstimadaMinutos,
+      usuarioCreacion,
     } = req.body;
 
     // Validación de campos requeridos
@@ -192,6 +194,8 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       finVentana: fin,
       duracionEstimadaMinutos,
       estado: 'PROGRAMADO',
+      usuarioCreacion: usuarioCreacion || 'Sistema',
+      usuarioActualizacion: usuarioCreacion || 'Sistema',
     });
 
     await registrarAuditoria({
@@ -212,6 +216,7 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
 
 export const obtenerPedidos = async (req: Request, res: Response): Promise<void> => {
   try {
+    await marcarPedidosAusentes(); // Revisa y marca AUSENTE antes de listar
     const pedidos = await Pedido.find({ activo: true }).populate('proveedorId').sort({ inicioVentana: 1 });
     res.status(200).json({ pedidos });
   } catch (error) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { API_BASE_URL, ApiError } from '../api';
+import { obtenerNombreUsuarioActual } from '../../auth';
 
 interface Parametro {
   _id: string;
@@ -33,7 +34,7 @@ export default function ParametrosPanel() {
     const response = await fetch(`${API_BASE_URL}/parametros/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ valor, descripcion }),
+      body: JSON.stringify({ valor, descripcion, usuarioActualizacion: obtenerNombreUsuarioActual() }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || 'No se pudo actualizar el parámetro');
@@ -43,7 +44,11 @@ export default function ParametrosPanel() {
 
   const inactivar = async (id: string) => {
     if (!window.confirm('¿Inactivar este parámetro? Se conservará en la base de datos.')) return;
-    const response = await fetch(`${API_BASE_URL}/parametros/${id}`, { method: 'DELETE' });
+    const response = await fetch(`${API_BASE_URL}/parametros/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuarioActualizacion: obtenerNombreUsuarioActual() }),
+    });
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || 'No se pudo inactivar el parámetro');
     setParametros((prev) => prev.filter((item) => item._id !== id));

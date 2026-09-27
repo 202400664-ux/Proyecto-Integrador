@@ -13,7 +13,7 @@ export const obtenerParametros = async (_req: Request, res: Response): Promise<v
 
 export const crearParametro = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { clave, valor, descripcion, activo = true } = req.body;
+    const { clave, valor, descripcion, activo = true, usuarioCreacion } = req.body;
 
     if (!clave || !valor || !descripcion) {
       res.status(400).json({ mensaje: 'Los campos clave, valor y descripción son obligatorios' });
@@ -26,13 +26,14 @@ export const crearParametro = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const nombreUsuario = usuarioCreacion || 'Sistema';
     const parametro = await Parametro.create({
       clave: String(clave).trim(),
       valor: String(valor),
       descripcion: String(descripcion).trim(),
       activo: Boolean(activo),
-      usuarioCreacion: 'Sistema',
-      usuarioActualizacion: 'Sistema',
+      usuarioCreacion: nombreUsuario,
+      usuarioActualizacion: nombreUsuario,
     });
 
     await registrarAuditoria({
@@ -51,7 +52,7 @@ export const crearParametro = async (req: Request, res: Response): Promise<void>
 export const actualizarParametro = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { valor, descripcion, activo } = req.body;
+    const { valor, descripcion, activo, usuarioActualizacion } = req.body;
 
     const parametro = await Parametro.findById(id);
     if (!parametro) {
@@ -63,7 +64,7 @@ export const actualizarParametro = async (req: Request, res: Response): Promise<
     if (descripcion !== undefined) parametro.descripcion = String(descripcion).trim();
     if (activo !== undefined) parametro.activo = Boolean(activo);
 
-    parametro.usuarioActualizacion = 'Sistema';
+    parametro.usuarioActualizacion = usuarioActualizacion || 'Sistema';
     await parametro.save();
 
     await registrarAuditoria({
@@ -83,7 +84,7 @@ export const inactivarParametro = async (req: Request, res: Response): Promise<v
   try {
     const parametro = await Parametro.findOneAndUpdate(
       { _id: req.params.id, activo: true },
-      { $set: { activo: false, usuarioActualizacion: 'Sistema' } },
+      { $set: { activo: false, usuarioActualizacion: req.body?.usuarioActualizacion || 'Sistema' } },
       { new: true }
     );
 
