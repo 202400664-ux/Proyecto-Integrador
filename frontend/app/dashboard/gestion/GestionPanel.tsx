@@ -213,7 +213,7 @@ export default function GestionPanel() {
         />
       )}
 
-      {pestana === 'parametros' && puede('parametros.ver') && <ParametrosPanel />}
+      {pestana === 'parametros' && puede('parametros.ver') && <ParametrosPanel puedeGestionar={puede('parametros.editar')} />}
 
       {pestana === 'mantenimientos' && <MantenimientosPanel />}
 
