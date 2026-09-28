@@ -22,12 +22,11 @@ function formatoLegible(iso: string): string {
 /**
  * Calcula dinámicamente el estado y el badge según:
  * 1. Si ya se registró la llegada en caseta (A TIEMPO, TARDÍO, ANTICIPADO).
- * 2. Si NO se ha registrado llegada y la ventana ya venció (VENCIDO / NO ENTREGADO).
+ * 2. Si NO se ha registrado llegada y la ventana ya venció (AUSENTE).
  * 3. Si NO se ha registrado llegada pero aún está en plazo (PROGRAMADO).
  */
 function obtenerInfoEstado(p: Pedido): { texto: string; clase: string } {
-  // Accedemos a fechaHoraLlegadaReal de manera segura
-  const fechaLlegada = (p as any).fechaHoraLlegadaReal;
+  const fechaLlegada = p.fechaHoraLlegadaReal;
 
   // Si ya tiene registrada fecha/hora de llegada real
   if (fechaLlegada) {
@@ -45,17 +44,20 @@ function obtenerInfoEstado(p: Pedido): { texto: string; clase: string } {
     }
   }
 
+  if (p.estado === 'CANCELADO') {
+    return { texto: 'CANCELADO', clase: 'bg-danger' };
+  }
+
+  if (p.estado === 'AUSENTE') {
+    return { texto: 'AUSENTE', clase: 'bg-danger' };
+  }
+
   // Si no se ha registrado llegada, revisamos si la ventana de entrega ya expiró
   const ahora = new Date();
   const finVentana = new Date(p.finVentana);
 
   if (ahora > finVentana) {
-    return { texto: 'NO ENTREGADO', clase: 'bg-danger' };
-  }
-
-  // Si la ventana aún no vence y no ha llegado
-  if ((p.estado as string) === 'CANCELADO') {
-    return { texto: 'CANCELADO', clase: 'bg-danger' };
+    return { texto: 'AUSENTE', clase: 'bg-danger' };
   }
 
   return { texto: 'PROGRAMADO', clase: 'bg-primary' };

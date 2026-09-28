@@ -32,61 +32,73 @@ const dentroDelHorarioOperativo = (inicio: Date, fin: Date): boolean => {
 const seTraslapan = (inicioA: Date, finA: Date, inicioB: Date, finB: Date): boolean =>
   inicioA < finB && inicioB < finA;
 
-// Genera hasta 3 ventanas alternativas disponibles, del mismo día y duración,
-// probando espacios libres después de cada pedido ya ocupado ese día.
+// Genera hasta 3 ventanas alternativas de la misma duración en días operativos.
 const generarAlternativas = async (
   inicioSolicitado: Date,
   duracionMinutos: number,
   excluirPedidoId?: string
 ): Promise<{ inicioVentana: Date; finVentana: Date }[]> => {
-  const dia = inicioSolicitado.getDay();
-  const horario = HORARIO_OPERATIVO[dia];
-  if (!horario) return [];
-
-  const inicioDelDia = new Date(inicioSolicitado);
-  inicioDelDia.setHours(Math.floor(horario.inicio), (horario.inicio % 1) * 60, 0, 0);
-
-  const finDelDia = new Date(inicioSolicitado);
-  finDelDia.setHours(Math.floor(horario.fin), (horario.fin % 1) * 60, 0, 0);
-
-  // Trae todos los pedidos activos de ese mismo día, ordenados por inicio
-  const inicioBusqueda = new Date(inicioSolicitado);
-  inicioBusqueda.setHours(0, 0, 0, 0);
-  const finBusqueda = new Date(inicioSolicitado);
-  finBusqueda.setHours(23, 59, 59, 999);
-
-  const pedidosDelDia = await Pedido.find({
-    estado: { $ne: 'CANCELADO' },
-    inicioVentana: { $gte: inicioBusqueda, $lte: finBusqueda },
-    ...(excluirPedidoId ? { _id: { $ne: excluirPedidoId } } : {}),
-  }).sort({ inicioVentana: 1 });
+  const primerDia = new Date(inicioSolicitado);
+  primerDia.setHours(0, 0, 0, 0);
+  const limiteBusqueda = new Date(primerDia);
+  limiteBusqueda.setDate(limiteBusqueda.getDate() + 90);
 
   const duracionMs = duracionMinutos * 60 * 1000;
   const alternativas: { inicioVentana: Date; finVentana: Date }[] = [];
+  if (duracionMs <= 0) return alternativas;
 
-  // Candidato 1: justo al abrir el centro ese día
-  let cursor = new Date(inicioDelDia);
+  const inicioBusqueda = new Date(inicioSolicitado);
+  inicioBusqueda.setHours(0, 0, 0, 0);
+  const pedidosDelDia = await Pedido.find({
+    estado: { $ne: 'CANCELADO' },
+    inicioVentana: { $gte: inicioBusqueda, $lt: limiteBusqueda },
+    ...(excluirPedidoId ? { _id: { $ne: excluirPedidoId } } : {}),
+  }).sort({ inicioVentana: 1 });
 
+  const pedidosPorDia = new Map<string, typeof pedidosDelDia>();
   for (const pedido of pedidosDelDia) {
-    const finPedido = new Date(pedido.finVentana);
-    const inicioPedido = new Date(pedido.inicioVentana);
-
-    // ¿Cabe un espacio libre entre el cursor actual y el inicio de este pedido?
-    if (cursor.getTime() + duracionMs <= inicioPedido.getTime()) {
-      const finCandidato = new Date(cursor.getTime() + duracionMs);
-      alternativas.push({ inicioVentana: new Date(cursor), finVentana: finCandidato });
-      if (alternativas.length >= 3) return alternativas;
-    }
-
-    // Avanza el cursor al final de este pedido si es más tarde
-    if (finPedido > cursor) cursor = new Date(finPedido);
+    const fecha = new Date(pedido.inicioVentana);
+    const clave = `${fecha.getFullYear()}-${fecha.getMonth()}-${fecha.getDate()}`;
+    const delDia = pedidosPorDia.get(clave) ?? [];
+    delDia.push(pedido);
+    pedidosPorDia.set(clave, delDia);
   }
 
-  // Después del último pedido del día, hasta el cierre
-  while (cursor.getTime() + duracionMs <= finDelDia.getTime() && alternativas.length < 3) {
-    const finCandidato = new Date(cursor.getTime() + duracionMs);
-    alternativas.push({ inicioVentana: new Date(cursor), finVentana: finCandidato });
-    cursor = finCandidato;
+  for (let desplazamiento = 0; desplazamiento < 90 && alternativas.length < 3; desplazamiento += 1) {
+    const fechaDia = new Date(primerDia);
+    fechaDia.setDate(fechaDia.getDate() + desplazamiento);
+    const horario = HORARIO_OPERATIVO[fechaDia.getDay()];
+    if (!horario) continue;
+
+    const inicioDelDia = new Date(fechaDia);
+    inicioDelDia.setHours(horario.inicio, 0, 0, 0);
+    const finDelDia = new Date(fechaDia);
+    finDelDia.setHours(horario.fin, 0, 0, 0);
+    if (duracionMs > finDelDia.getTime() - inicioDelDia.getTime()) continue;
+
+    let cursor = desplazamiento === 0 && inicioSolicitado > inicioDelDia
+      ? new Date(inicioSolicitado)
+      : inicioDelDia;
+    const clave = `${fechaDia.getFullYear()}-${fechaDia.getMonth()}-${fechaDia.getDate()}`;
+
+    for (const pedido of pedidosPorDia.get(clave) ?? []) {
+      const inicioPedido = new Date(pedido.inicioVentana);
+      const finPedido = new Date(pedido.finVentana);
+
+      while (cursor.getTime() + duracionMs <= inicioPedido.getTime() && alternativas.length < 3) {
+        const finCandidato = new Date(cursor.getTime() + duracionMs);
+        alternativas.push({ inicioVentana: new Date(cursor), finVentana: finCandidato });
+        cursor = finCandidato;
+      }
+
+      if (finPedido > cursor) cursor = finPedido;
+    }
+
+    while (cursor.getTime() + duracionMs <= finDelDia.getTime() && alternativas.length < 3) {
+      const finCandidato = new Date(cursor.getTime() + duracionMs);
+      alternativas.push({ inicioVentana: new Date(cursor), finVentana: finCandidato });
+      cursor = finCandidato;
+    }
   }
 
   return alternativas;

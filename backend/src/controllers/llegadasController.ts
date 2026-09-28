@@ -82,8 +82,11 @@ export async function marcarPedidosAusentes(): Promise<void> {
     {
       activo: true,
       estado: 'PROGRAMADO',
-      fechaHoraLlegadaReal: { $exists: false },
-      finVentana: { $lt: limite },
+      $or: [
+        { fechaHoraLlegadaReal: { $exists: false } },
+        { fechaHoraLlegadaReal: null },
+      ],
+      finVentana: { $lte: limite },
     },
     {
       $set: { estado: 'AUSENTE', usuarioActualizacion: 'Sistema (auto)' },
