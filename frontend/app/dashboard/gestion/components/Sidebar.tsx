@@ -24,14 +24,14 @@ const MENU_ITEMS: Array<{ key: PestanaDashboard; label: string; icon: string }> 
   { key: 'proveedores', label: 'Proveedores', icon: '▣' },
   { key: 'pedidos', label: 'Pedidos', icon: '▤' },
   { key: 'caseta', label: 'Caseta', icon: '◫' },
-  { key: 'mantenimientos', label: 'Mantenimientos', icon: '◧' },
   { key: 'auditoria', label: 'Auditoría', icon: '◌' },
 ];
 
 export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerrar }: SidebarProps) {
-  const items = rol === 'administrador'
-    ? [...MENU_ITEMS, { key: 'parametros' as const, label: 'Parámetros', icon: '⚙' }]
-    : MENU_ITEMS;
+  const items = [
+    ...MENU_ITEMS.filter((item) => item.key !== 'auditoria' || rol !== 'operador'),
+    ...(rol === 'administrador' ? [{ key: 'parametros' as const, label: 'Parámetros', icon: '⚙' }] : []),
+  ];
 
   return (
     <aside

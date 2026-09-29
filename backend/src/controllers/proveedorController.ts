@@ -118,10 +118,14 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
 
 export const obtenerProveedores = async (req: Request, res: Response): Promise<void> => {
   try {
-    const categoria = req.query.categoria;
-    if (categoria !== undefined && (typeof categoria !== 'string' || !CATEGORIAS_VALIDAS.includes(categoria as CategoriaProveedor))) {
-      res.status(400).json({ mensaje: `La categoría debe ser una de: ${CATEGORIAS_VALIDAS.join(', ')}` });
-      return;
+    const categoriaSolicitada = req.query.categoria;
+    let categoria: CategoriaProveedor | undefined;
+    if (categoriaSolicitada !== undefined) {
+      if (typeof categoriaSolicitada !== 'string' || !CATEGORIAS_VALIDAS.includes(categoriaSolicitada as CategoriaProveedor)) {
+        res.status(400).json({ mensaje: `La categoría debe ser una de: ${CATEGORIAS_VALIDAS.join(', ')}` });
+        return;
+      }
+      categoria = categoriaSolicitada as CategoriaProveedor;
     }
 
     const proveedores = await Proveedor.find({

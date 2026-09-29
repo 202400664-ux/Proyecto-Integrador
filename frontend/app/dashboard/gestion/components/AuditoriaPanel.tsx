@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { encabezadosAutenticados } from '../api';
 
 interface AuditoriaRow {
   _id: string;
@@ -18,7 +19,9 @@ export default function AuditoriaPanel() {
   useEffect(() => {
     const cargar = async () => {
       try {
-        const response = await fetch('http://localhost:4000/api/auditoria');
+        const response = await fetch('http://localhost:4000/api/auditoria', {
+          headers: encabezadosAutenticados(),
+        });
         const data = await response.json();
         if (!response.ok) throw new Error(data.mensaje || 'Error al consultar auditoría');
         setItems(data.auditorias || []);

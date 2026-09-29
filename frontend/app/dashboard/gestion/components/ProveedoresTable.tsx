@@ -5,11 +5,13 @@ interface ProveedoresTableProps {
   cargando: boolean;
   categoriaFiltro: string;
   onCategoriaFiltroChange: (categoria: string) => void;
+  puedeEditar: boolean;
+  puedeInactivar: boolean;
   onEditar: (proveedor: Proveedor) => void;
   onInactivar: (id: string) => void;
 }
 
-export default function ProveedoresTable({ proveedores, cargando, categoriaFiltro, onCategoriaFiltroChange, onEditar, onInactivar }: ProveedoresTableProps) {
+export default function ProveedoresTable({ proveedores, cargando, categoriaFiltro, onCategoriaFiltroChange, puedeEditar, puedeInactivar, onEditar, onInactivar }: ProveedoresTableProps) {
   return (
     <div className="card p-4 shadow-sm border-0">
       <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-3">
@@ -45,7 +47,7 @@ export default function ProveedoresTable({ proveedores, cargando, categoriaFiltr
                 <th>Teléfono</th>
                 <th>Correo</th>
                 <th>Estado</th>
-                <th>Acciones</th>
+                {(puedeEditar || puedeInactivar) && <th>Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -62,14 +64,12 @@ export default function ProveedoresTable({ proveedores, cargando, categoriaFiltr
                       {p.estado}
                     </span>
                   </td>
-                  <td className="text-nowrap">
-                    <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => onEditar(p)}>
-                      Editar
-                    </button>
-                    <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onInactivar(p._id)}>
-                      Inactivar
-                    </button>
-                  </td>
+                  {(puedeEditar || puedeInactivar) && (
+                    <td className="text-nowrap">
+                      {puedeEditar && <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => onEditar(p)}>Editar</button>}
+                      {puedeInactivar && <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onInactivar(p._id)}>Inactivar</button>}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

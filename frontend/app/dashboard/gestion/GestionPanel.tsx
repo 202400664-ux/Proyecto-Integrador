@@ -182,6 +182,8 @@ export default function GestionPanel() {
             proveedores={categoriaProveedor ? proveedoresTabla : proveedores}
             cargando={cargandoProveedores}
             categoriaFiltro={categoriaProveedor}
+            puedeEditar={puede('proveedores.editar')}
+            puedeInactivar={puede('proveedores.inactivar')}
             onCategoriaFiltroChange={(categoria) => {
               setCategoriaProveedor(categoria);
               if (!categoria) setCargandoProveedores(false);
@@ -232,6 +234,8 @@ export default function GestionPanel() {
             pedidos={pedidos}
             proveedores={proveedores}
             cargando={cargandoPedidos}
+            puedeEditar={puede('pedidos.editar')}
+            puedeCancelar={puede('pedidos.cancelar')}
             onEditar={setPedidoEditar}
             onCancelar={async (id) => {
               if (!window.confirm('¿Cancelar este pedido? Se conservará en la base de datos, pero dejará de aparecer en el tablero.')) return;
@@ -264,7 +268,7 @@ export default function GestionPanel() {
 
       {pestana === 'mantenimientos' && <MantenimientosPanel />}
 
-      {pestana === 'auditoria' && <AuditoriaPanel />}
+      {pestana === 'auditoria' && puede('auditoria.ver') && <AuditoriaPanel />}
     </div>
   );
 }
