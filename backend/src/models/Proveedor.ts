@@ -23,7 +23,6 @@ const proveedorSchema = new Schema<IProveedor>(
       type: String,
       required: true,
       trim: true,
-      match: [/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/, 'La razón social solo puede contener letras'],
     },
     identificacionTributaria: {
       type: String,
@@ -70,12 +69,10 @@ const proveedorSchema = new Schema<IProveedor>(
     usuarioCreacion: {
       type: String,
       required: true,
-      default: 'Sistema',
     },
     usuarioActualizacion: {
       type: String,
       required: true,
-      default: 'Sistema',
     },
   },
   { 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { ApiError, actualizarPedido, crearPedido, type NuevoPedidoPayload } from '../api';
 import type { ConflictoPedido, Pedido, Proveedor, VentanaAlternativa } from '../types';
 
@@ -37,6 +37,19 @@ function formatoLegible(isoOrLocal: string): string {
   return fecha.toLocaleString('es-SV', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function estadoInicialPedido(pedido?: Pedido | null): FormState {
+  if (!pedido) return ESTADO_INICIAL;
+  return {
+    numeroPedido: pedido.numeroPedido,
+    proveedorId: typeof pedido.proveedorId === 'string' ? pedido.proveedorId : pedido.proveedorId._id,
+    tipoProducto: pedido.tipoProducto,
+    fechaHoraProgramada: aDatetimeLocal(new Date(pedido.inicioVentana)),
+    inicioVentana: aDatetimeLocal(new Date(pedido.inicioVentana)),
+    finVentana: aDatetimeLocal(new Date(pedido.finVentana)),
+    duracionEstimadaMinutos: String(pedido.duracionEstimadaMinutos),
+  };
+}
+
 interface PedidoFormProps {
   proveedores: Proveedor[];
   onPedidoCreado: (pedido: Pedido) => void;
@@ -46,27 +59,11 @@ interface PedidoFormProps {
 }
 
 export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, onPedidoActualizado, onCancelarEdicion }: PedidoFormProps) {
-  const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
+  const [form, setForm] = useState<FormState>(() => estadoInicialPedido(pedidoEditar));
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
   const [conflicto, setConflicto] = useState<ConflictoPedido | null>(null);
   const [enviando, setEnviando] = useState(false);
-
-  useEffect(() => {
-    if (!pedidoEditar) {
-      setForm(ESTADO_INICIAL);
-      return;
-    }
-    setForm({
-      numeroPedido: pedidoEditar.numeroPedido,
-      proveedorId: typeof pedidoEditar.proveedorId === 'string' ? pedidoEditar.proveedorId : pedidoEditar.proveedorId._id,
-      tipoProducto: pedidoEditar.tipoProducto,
-      fechaHoraProgramada: aDatetimeLocal(new Date(pedidoEditar.inicioVentana)),
-      inicioVentana: aDatetimeLocal(new Date(pedidoEditar.inicioVentana)),
-      finVentana: aDatetimeLocal(new Date(pedidoEditar.finVentana)),
-      duracionEstimadaMinutos: String(pedidoEditar.duracionEstimadaMinutos),
-    });
-  }, [pedidoEditar]);
 
   const handleChange = (campo: keyof FormState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -237,7 +234,7 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
       </div>
 
       <p className="text-secondary small mt-3 mb-0">
-        Horario operativo del centro: lunes a sábado, 7:00 a.m. – 5:00 p.m.
+        Horario operativo configurado en parámetros, de lunes a sábado.
       </p>
 
       <button type="submit" className="btn btn-primary mt-3 align-self-start px-4" disabled={enviando}>

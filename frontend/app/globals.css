@@ -269,6 +269,19 @@ body {
   backdrop-filter: blur(6px);
 }
 
+.welcome-empty {
+  min-height: 18rem;
+  display: grid;
+  place-items: center;
+  color: #47637a;
+}
+
+.welcome-empty h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
 .dashboard-panel .nav-tabs {
   border-bottom: 1px solid rgba(18,49,73,0.12);
   margin-bottom: 1.5rem;

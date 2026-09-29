@@ -35,12 +35,10 @@ const parametroSchema = new Schema<IParametro>(
     usuarioCreacion: {
       type: String,
       required: true,
-      default: 'Sistema',
     },
     usuarioActualizacion: {
       type: String,
       required: true,
-      default: 'Sistema',
     },
   },
   { 

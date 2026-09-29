@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { ApiError, actualizarProveedor, crearProveedor, type NuevoProveedorPayload } from '../api';
 import type { Proveedor } from '../types';
 import { formatearTelefono, soloLetras, soloNumeros } from '../validacion';
@@ -13,6 +13,18 @@ const ESTADO_INICIAL: NuevoProveedorPayload = {
   telefono: '',
   emailContacto: '',
 };
+
+function estadoInicialProveedor(proveedor?: Proveedor | null): NuevoProveedorPayload {
+  if (!proveedor) return ESTADO_INICIAL;
+  return {
+    razonSocial: proveedor.razonSocial,
+    identificacionTributaria: proveedor.identificacionTributaria,
+    categoria: proveedor.categoria,
+    contactoNombre: proveedor.contactoNombre,
+    telefono: proveedor.telefono,
+    emailContacto: proveedor.emailContacto,
+  };
+}
 
 interface ProveedorFormProps {
   onProveedorCreado: (proveedor: Proveedor) => void;
@@ -27,25 +39,10 @@ export default function ProveedorForm({
   onProveedorActualizado,
   onCancelarEdicion,
 }: ProveedorFormProps) {
-  const [form, setForm] = useState<NuevoProveedorPayload>(ESTADO_INICIAL);
+  const [form, setForm] = useState<NuevoProveedorPayload>(() => estadoInicialProveedor(proveedorEditar));
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
   const [enviando, setEnviando] = useState(false);
-
-  useEffect(() => {
-    if (!proveedorEditar) {
-      setForm(ESTADO_INICIAL);
-      return;
-    }
-    setForm({
-      razonSocial: proveedorEditar.razonSocial,
-      identificacionTributaria: proveedorEditar.identificacionTributaria,
-      categoria: proveedorEditar.categoria,
-      contactoNombre: proveedorEditar.contactoNombre,
-      telefono: proveedorEditar.telefono,
-      emailContacto: proveedorEditar.emailContacto,
-    });
-  }, [proveedorEditar]);
 
   // Cada campo se sanea mientras el usuario escribe: no se permite teclear
   // caracteres inválidos en vez de solo rechazarlos hasta enviar el formulario.
@@ -112,7 +109,7 @@ export default function ProveedorForm({
             type="text"
             className="form-control"
             value={form.razonSocial}
-            onChange={handleSoloLetras('razonSocial')}
+            onChange={handleTextoLibre('razonSocial')}
             required
           />
         </div>

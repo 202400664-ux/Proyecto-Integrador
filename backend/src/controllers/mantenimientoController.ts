@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Mantenimiento } from '../models/Mantenimiento.js';
 import { registrarAuditoria } from './auditoriaController.js';
+import { validarNombreCompleto } from '../utils/usuario.js';
 
 export const crearMantenimiento = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -13,10 +14,12 @@ export const crearMantenimiento = async (req: Request, res: Response): Promise<v
       responsable,
       fechaProgramada,
       observaciones,
+      usuarioCreacion,
     } = req.body;
+    const nombreUsuario = validarNombreCompleto(usuarioCreacion);
 
-    if (!numeroOrden || !titulo || !descripcion || !tipo || !responsable || !fechaProgramada) {
-      res.status(400).json({ mensaje: 'Faltan datos obligatorios para registrar el mantenimiento' });
+    if (!numeroOrden || !titulo || !descripcion || !tipo || !responsable || !fechaProgramada || !nombreUsuario) {
+      res.status(400).json({ mensaje: 'Faltan datos obligatorios o el nombre completo del usuario' });
       return;
     }
 
@@ -29,15 +32,15 @@ export const crearMantenimiento = async (req: Request, res: Response): Promise<v
       responsable,
       fechaProgramada: new Date(fechaProgramada),
       observaciones,
-      usuarioCreacion: responsable,
-      usuarioActualizacion: responsable,
+      usuarioCreacion: nombreUsuario,
+      usuarioActualizacion: nombreUsuario,
     });
 
     await registrarAuditoria({
       entidad: 'Mantenimiento',
       accion: 'crear',
       detalle: `Se registró la orden ${mantenimiento.numeroOrden} para ${mantenimiento.titulo}`,
-      usuario: responsable,
+      usuario: nombreUsuario,
     });
 
     res.status(201).json({

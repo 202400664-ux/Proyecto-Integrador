@@ -4,6 +4,7 @@ interface PedidosTableProps {
   pedidos: Pedido[];
   proveedores: ProveedorRef[];
   cargando: boolean;
+  puedeGestionar: boolean;
   onEditar: (pedido: Pedido) => void;
   onCancelar: (id: string) => void;
 }
@@ -26,8 +27,11 @@ function formatoLegible(iso: string): string {
  * 3. Si NO se ha registrado llegada pero aún está en plazo (PROGRAMADO).
  */
 function obtenerInfoEstado(p: Pedido): { texto: string; clase: string } {
-  // Accedemos a fechaHoraLlegadaReal de manera segura
-  const fechaLlegada = (p as any).fechaHoraLlegadaReal;
+  const fechaLlegada = p.fechaHoraLlegadaReal;
+
+  if (p.estado === 'AUSENTE') {
+    return { texto: 'AUSENTE', clase: 'bg-danger' };
+  }
 
   // Si ya tiene registrada fecha/hora de llegada real
   if (fechaLlegada) {
@@ -61,7 +65,7 @@ function obtenerInfoEstado(p: Pedido): { texto: string; clase: string } {
   return { texto: 'PROGRAMADO', clase: 'bg-primary' };
 }
 
-export default function PedidosTable({ pedidos, proveedores, cargando, onEditar, onCancelar }: PedidosTableProps) {
+export default function PedidosTable({ pedidos, proveedores, cargando, puedeGestionar, onEditar, onCancelar }: PedidosTableProps) {
   return (
     <div className="card p-4 shadow-sm border-0">
       <h2 className="h5 fw-bold mb-3" style={{ color: '#123149' }}>
@@ -83,7 +87,7 @@ export default function PedidosTable({ pedidos, proveedores, cargando, onEditar,
                 <th>Ventana</th>
                 <th>Duración</th>
                 <th>Estado</th>
-                <th>Acciones</th>
+                {puedeGestionar && <th>Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -104,20 +108,22 @@ export default function PedidosTable({ pedidos, proveedores, cargando, onEditar,
                         {infoEstado.texto}
                       </span>
                     </td>
-                    <td className="text-nowrap">
-                      {yaEntregado ? (
-                        <small className="text-secondary fw-semibold">Ya entregado</small>
-                      ) : (
-                        <>
-                          <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => onEditar(p)}>
-                            Editar
-                          </button>
-                          <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onCancelar(p._id)}>
-                            Cancelar
-                          </button>
-                        </>
-                      )}
-                    </td>
+                    {puedeGestionar && (
+                      <td className="text-nowrap">
+                        {yaEntregado ? (
+                          <small className="text-secondary fw-semibold">Ya entregado</small>
+                        ) : (
+                          <>
+                            <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => onEditar(p)}>
+                              Editar
+                            </button>
+                            <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onCancelar(p._id)}>
+                              Cancelar
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}

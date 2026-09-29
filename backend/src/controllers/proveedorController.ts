@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Proveedor, type CategoriaProveedor } from '../models/Proveedor.js';
 import { registrarAuditoria } from './auditoriaController.js';
+import { validarNombreCompleto } from '../utils/usuario.js';
 
 const CATEGORIAS_VALIDAS: CategoriaProveedor[] = ['construcción', 'general'];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,6 +23,7 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
       emailContacto,
       usuarioCreacion,
     } = req.body;
+    const nombreUsuario = validarNombreCompleto(usuarioCreacion);
 
     // 1. Campos obligatorios
     if (
@@ -30,17 +32,14 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
       !categoria ||
       !contactoNombre ||
       !telefono ||
-      !emailContacto
+      !emailContacto ||
+      !nombreUsuario
     ) {
-      res.status(400).json({ mensaje: 'Todos los campos del proveedor son obligatorios' });
+      res.status(400).json({ mensaje: 'Todos los campos y el nombre completo del usuario son obligatorios' });
       return;
     }
 
-    // 2. Formato de razón social y nombre de contacto: solo letras y espacios
-    if (!SOLO_LETRAS_REGEX.test(razonSocial)) {
-      res.status(400).json({ mensaje: 'La razón social solo puede contener letras' });
-      return;
-    }
+    // 2. Formato del nombre de contacto: solo letras y espacios
     if (!SOLO_LETRAS_REGEX.test(contactoNombre)) {
       res.status(400).json({ mensaje: 'El nombre de contacto solo puede contener letras' });
       return;
@@ -92,15 +91,15 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
       emailContacto,
       estado: 'activo',
       activo: true,
-      usuarioCreacion: usuarioCreacion || 'Sistema',
-      usuarioActualizacion: usuarioCreacion || 'Sistema',
+      usuarioCreacion: nombreUsuario,
+      usuarioActualizacion: nombreUsuario,
     });
 
     await registrarAuditoria({
       entidad: 'Proveedor',
       accion: 'crear',
       detalle: `Se registró el proveedor ${proveedor.razonSocial} (${proveedor.identificacionTributaria})`,
-      usuario: 'Sistema',
+      usuario: nombreUsuario,
     });
 
     res.status(201).json({ mensaje: 'Proveedor registrado correctamente', proveedor });
@@ -116,9 +115,19 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const obtenerProveedores = async (_req: Request, res: Response): Promise<void> => {
+export const obtenerProveedores = async (req: Request, res: Response): Promise<void> => {
   try {
-    const proveedores = await Proveedor.find({ activo: true, estado: 'activo' }).sort({ razonSocial: 1 });
+    const categoria = req.query.categoria;
+    if (categoria !== undefined && (typeof categoria !== 'string' || !CATEGORIAS_VALIDAS.includes(categoria as CategoriaProveedor))) {
+      res.status(400).json({ mensaje: `La categoría debe ser una de: ${CATEGORIAS_VALIDAS.join(', ')}` });
+      return;
+    }
+    const filtro: { activo: boolean; estado: 'activo'; categoria?: CategoriaProveedor } = {
+      activo: true,
+      estado: 'activo',
+      ...(typeof categoria === 'string' ? { categoria: categoria as CategoriaProveedor } : {}),
+    };
+    const proveedores = await Proveedor.find(filtro).sort({ razonSocial: 1 });
     res.status(200).json({ proveedores });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error interno al listar proveedores', error });
@@ -127,6 +136,11 @@ export const obtenerProveedores = async (_req: Request, res: Response): Promise<
 
 export const actualizarProveedor = async (req: Request, res: Response): Promise<void> => {
   try {
+    const nombreUsuario = validarNombreCompleto(req.body.usuarioActualizacion);
+    if (!nombreUsuario) {
+      res.status(400).json({ mensaje: 'usuarioActualizacion debe incluir el nombre completo del usuario' });
+      return;
+    }
     const proveedor = await Proveedor.findOne({ _id: req.params.id, activo: true });
     if (!proveedor) {
       res.status(404).json({ mensaje: 'Proveedor no encontrado o inactivo' });
@@ -137,7 +151,17 @@ export const actualizarProveedor = async (req: Request, res: Response): Promise<
     for (const campo of campos) {
       if (req.body[campo] !== undefined) (proveedor as any)[campo] = req.body[campo];
     }
-    proveedor.usuarioActualizacion = req.body.usuarioActualizacion || 'Sistema';
+    if (proveedor.identificacionTributaria !== req.body.identificacionTributaria) {
+      const existeNIT = await Proveedor.findOne({
+        identificacionTributaria: proveedor.identificacionTributaria,
+        _id: { $ne: proveedor._id },
+      });
+      if (existeNIT) {
+        res.status(409).json({ mensaje: 'Ya existe un proveedor registrado con esa identificación tributaria' });
+        return;
+      }
+    }
+    proveedor.usuarioActualizacion = nombreUsuario;
     await proveedor.save();
 
     await registrarAuditoria({
@@ -154,9 +178,14 @@ export const actualizarProveedor = async (req: Request, res: Response): Promise<
 
 export const inactivarProveedor = async (req: Request, res: Response): Promise<void> => {
   try {
+    const nombreUsuario = validarNombreCompleto(req.body?.usuarioActualizacion);
+    if (!nombreUsuario) {
+      res.status(400).json({ mensaje: 'usuarioActualizacion debe incluir el nombre completo del usuario' });
+      return;
+    }
     const proveedor = await Proveedor.findOneAndUpdate(
       { _id: req.params.id, activo: true },
-      { $set: { activo: false, estado: 'inactivo', usuarioActualizacion: req.body.usuarioActualizacion || 'Sistema' } },
+      { $set: { activo: false, estado: 'inactivo', usuarioActualizacion: nombreUsuario } },
       { new: true }
     );
     if (!proveedor) {

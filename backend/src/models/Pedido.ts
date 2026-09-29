@@ -71,12 +71,10 @@ const pedidoSchema = new Schema<IPedido>(
     usuarioCreacion: {
       type: String,
       required: true,
-      default: 'Sistema',
     },
     usuarioActualizacion: {
       type: String,
       required: true,
-      default: 'Sistema',
     },
   },
   { 

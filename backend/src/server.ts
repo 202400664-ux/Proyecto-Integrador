@@ -9,6 +9,7 @@ import llegadasRoutes from './routes/llegadas.js';
 import mantenimientosRoutes from './routes/mantenimientos.js';
 import auditoriaRoutes from './routes/auditoria.js';
 import parametrosRoutes from './routes/parametros.js';
+import { marcarPedidosAusentes } from './controllers/llegadasController.js';
 
 dotenv.config();
 
@@ -22,7 +23,16 @@ app.use(express.json());
 // 1. Conectar a MongoDB
 mongoose
   .connect(MONGO_URI)
-  .then(() => console.log('✅ Conectado a MongoDB correctamente'))
+  .then(() => {
+    console.log('✅ Conectado a MongoDB correctamente');
+    const revisarAusentes = () => {
+      void marcarPedidosAusentes().catch((error) =>
+        console.error('Error al actualizar pedidos ausentes:', error)
+      );
+    };
+    revisarAusentes();
+    setInterval(revisarAusentes, 60_000);
+  })
   .catch((err) => console.error('❌ Error al conectar con MongoDB:', err));
 
 // 2. Registrar las rutas

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRol } from '../../RolContext';
+import { obtenerNombreUsuarioActual } from '../../auth';
 
 interface Mantenimiento {
   _id: string;
@@ -57,7 +58,21 @@ export default function MantenimientosPanel() {
   };
 
   useEffect(() => {
-    cargarMantenimientos();
+    let activo = true;
+    const cargarInicial = async () => {
+      try {
+        const response = await fetch('http://localhost:4000/api/mantenimientos');
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.mensaje || 'No se pudieron cargar los mantenimientos');
+        if (activo) setMantenimientos(data.mantenimientos || []);
+      } catch (err) {
+        if (activo) setMensaje(err instanceof Error ? err.message : 'Error cargando mantenimientos');
+      } finally {
+        if (activo) setCargando(false);
+      }
+    };
+    void cargarInicial();
+    return () => { activo = false; };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,7 +83,7 @@ export default function MantenimientosPanel() {
       const response = await fetch('http://localhost:4000/api/mantenimientos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, usuarioCreacion: obtenerNombreUsuarioActual() }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.mensaje || 'Error al registrar mantenimiento');

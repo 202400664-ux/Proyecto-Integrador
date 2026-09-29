@@ -28,25 +28,23 @@ export default function ParametrosPanel({ puedeGestionar }: ParametrosPanelProps
   const [descripcion, setDescripcion] = useState('');
   const [error, setError] = useState('');
 
-  const cargar = async () => {
-    const response = await fetch(`${API_BASE_URL}/parametros`);
-    const data = await response.json();
-    if (!response.ok) throw new ApiError(response.status, data, data.mensaje || 'No se pudieron cargar los parámetros');
-    setParametros(data.parametros || []);
-  };
-
   useEffect(() => {
+    let activo = true;
     const cargarInicial = async () => {
       try {
-        await cargar();
+        const response = await fetch(`${API_BASE_URL}/parametros`);
+        const data = await response.json();
+        if (!response.ok) throw new ApiError(response.status, data, data.mensaje || 'No se pudieron cargar los parámetros');
+        if (activo) setParametros(data.parametros || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudieron cargar los parámetros');
+        if (activo) setError(err instanceof Error ? err.message : 'No se pudieron cargar los parámetros');
       } finally {
-        setCargando(false);
+        if (activo) setCargando(false);
       }
     };
 
     void cargarInicial();
+    return () => { activo = false; };
   }, []);
 
   const guardar = async (id: string) => {
@@ -124,7 +122,14 @@ export default function ParametrosPanel({ puedeGestionar }: ParametrosPanelProps
           <div className="row g-3">
             <div className="col-md-4">
               <label htmlFor="parametro-clave" className="form-label">Clave</label>
-              <input id="parametro-clave" className="form-control" value={clave} onChange={(event) => setClave(event.target.value)} required />
+              <input id="parametro-clave" className="form-control" list="claves-parametros" value={clave} onChange={(event) => setClave(event.target.value.trim())} required />
+              <datalist id="claves-parametros">
+                <option value="tolerancia_anticipado_minutos" />
+                <option value="tolerancia_tardio_minutos" />
+                <option value="tolerancia_ausente_minutos" />
+                <option value="hora_apertura" />
+                <option value="hora_cierre" />
+              </datalist>
             </div>
             <div className="col-md-4">
               <label htmlFor="parametro-valor" className="form-label">Valor</label>
@@ -153,14 +158,16 @@ export default function ParametrosPanel({ puedeGestionar }: ParametrosPanelProps
                   <td className="text-nowrap">
                     {editando === parametro._id ? (
                       <>
-                        <button type="button" className="btn btn-sm btn-primary me-2" onClick={() => guardar(parametro._id)}>Guardar</button>
+                        <button type="button" className="btn btn-sm btn-primary me-2" onClick={() => void guardar(parametro._id).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo guardar el parámetro'))}>Guardar</button>
                         <button type="button" className="btn btn-sm btn-link" onClick={() => setEditando(null)}>Cancelar</button>
                       </>
-                    ) : (
+                    ) : puedeGestionar ? (
                       <>
                         <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => { setEditando(parametro._id); setValor(parametro.valor); setDescripcion(parametro.descripcion); }}>Editar</button>
-                        <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => inactivar(parametro._id)}>Inactivar</button>
+                        <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => void inactivar(parametro._id).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo inactivar el parámetro'))}>Inactivar</button>
                       </>
+                    ) : (
+                      <span className="text-secondary small">Solo lectura</span>
                     )}
                   </td>
                 </tr>

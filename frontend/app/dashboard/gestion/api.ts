@@ -22,6 +22,12 @@ export interface NuevoPedidoPayload {
   duracionEstimadaMinutos: number;
 }
 
+export interface ResultadoLlegada {
+  mensaje: string;
+  estadoCalculado: Pedido['estado'];
+  pedido: Pedido & { fechaHoraLlegadaReal: string };
+}
+
 /** Error tipado que conserva el cuerpo JSON devuelto por la API (mensaje, alternativas, etc.). */
 export class ApiError extends Error {
   status: number;
@@ -43,8 +49,9 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
   return data as T;
 }
 
-export async function obtenerProveedores(): Promise<Proveedor[]> {
-  const response = await fetch(`${API_BASE_URL}/proveedores`);
+export async function obtenerProveedores(categoria?: string): Promise<Proveedor[]> {
+  const query = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
+  const response = await fetch(`${API_BASE_URL}/proveedores${query}`);
   const data = await parseOrThrow<{ proveedores: Proveedor[] }>(response);
   return data.proveedores;
 }
@@ -113,7 +120,7 @@ export async function cancelarPedido(id: string): Promise<void> {
   await parseOrThrow(response);
 }
 
-export async function registrarArribo(numeroPedido: string, usuarioNombre: string) {
+export async function registrarArribo(numeroPedido: string, usuarioNombre: string): Promise<ResultadoLlegada> {
   const token = localStorage.getItem('token');
   const response = await fetch('http://localhost:4000/api/llegadas', {
     method: 'POST',
@@ -129,5 +136,5 @@ export async function registrarArribo(numeroPedido: string, usuarioNombre: strin
     throw new Error(data.mensaje || 'Error al procesar la llegada');
   }
 
-  return data;
+  return data as ResultadoLlegada;
 }

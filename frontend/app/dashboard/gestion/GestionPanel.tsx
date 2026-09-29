@@ -90,47 +90,16 @@ export default function GestionPanel() {
       {errorCarga && <div className="alert alert-danger">{errorCarga}</div>}
 
       {pestana === 'inicio' && (
-        <div className="welcome-panel card p-4 shadow-sm border-0">
-          <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-            <div>
-              <p className="text-uppercase mb-2 fw-bold" style={{ letterSpacing: '0.14em', color: '#F1BD4B' }}>Panel principal</p>
-              <h2 className="mb-0" style={{ color: '#123149' }}>Bienvenido al sistema</h2>
-            </div>
-            <span className="badge bg-light text-primary px-3 py-2">Dashboard operativo</span>
-          </div>
-          <div className="row g-3">
-            <div className="col-md-4">
-              <div className="card h-100 border-0 bg-light">
-                <div className="card-body">
-                  <h3 className="h6 fw-bold text-primary">Proveedores</h3>
-                  <p className="mb-0 text-secondary">Administra altas, estados y contacto de proveedores.</p>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-4">
-              <div className="card h-100 border-0 bg-light">
-                <div className="card-body">
-                  <h3 className="h6 fw-bold text-primary">Pedidos</h3>
-                  <p className="mb-0 text-secondary">Programación de ventanas, traslapes y alternativas.</p>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-4">
-              <div className="card h-100 border-0 bg-light">
-                <div className="card-body">
-                  <h3 className="h6 fw-bold text-primary">Caseta</h3>
-                  <p className="mb-0 text-secondary">Registro de arribos y clasificación por tolerancia.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <section className="welcome-empty" aria-label="Bienvenida">
+          <h2>Bienvenido</h2>
+        </section>
       )}
 
       {pestana === 'proveedores' && (
         <>
           {puede('proveedores.crear') && (
             <ProveedorForm
+              key={proveedorEditar?._id ?? 'nuevo-proveedor'}
               proveedorEditar={proveedorEditar}
               onCancelarEdicion={() => setProveedorEditar(null)}
               onProveedorActualizado={(actualizado) => {
@@ -147,6 +116,7 @@ export default function GestionPanel() {
           <ProveedoresTable
             proveedores={proveedores}
             cargando={cargandoProveedores}
+            puedeGestionar={puede('proveedores.crear')}
             onEditar={setProveedorEditar}
             onInactivar={async (id) => {
               if (!window.confirm('¿Inactivar este proveedor?')) return;
@@ -165,6 +135,7 @@ export default function GestionPanel() {
         <>
           {puede('pedidos.crear') && (
             <PedidoForm
+              key={pedidoEditar?._id ?? 'nuevo-pedido'}
               proveedores={proveedores}
               pedidoEditar={pedidoEditar}
               onCancelarEdicion={() => setPedidoEditar(null)}
@@ -185,6 +156,7 @@ export default function GestionPanel() {
             pedidos={pedidos}
             proveedores={proveedores}
             cargando={cargandoPedidos}
+            puedeGestionar={puede('pedidos.crear')}
             onEditar={setPedidoEditar}
             onCancelar={async (id) => {
               if (!window.confirm('¿Cancelar este pedido? Se conservará en la base de datos, pero dejará de aparecer en el tablero.')) return;

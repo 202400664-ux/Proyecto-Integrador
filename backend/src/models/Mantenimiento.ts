@@ -77,12 +77,10 @@ const mantenimientoSchema = new Schema<IMantenimiento>(
     usuarioCreacion: {
       type: String,
       required: true,
-      default: 'Sistema',
     },
     usuarioActualizacion: {
       type: String,
       required: true,
-      default: 'Sistema',
     },
   },
   {

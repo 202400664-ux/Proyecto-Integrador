@@ -6,6 +6,7 @@ export interface IAuditoria extends Document {
   detalle: string;
   usuario: string;
   fecha: Date;
+  activo: boolean;
 }
 
 const auditoriaSchema = new Schema<IAuditoria>(
@@ -28,8 +29,12 @@ const auditoriaSchema = new Schema<IAuditoria>(
     usuario: {
       type: String,
       required: true,
-      default: 'Sistema',
       trim: true,
+    },
+    activo: {
+      type: Boolean,
+      default: true,
+      required: true,
     },
     fecha: {
       type: Date,

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { registrarArribo } from '../api';
+import { registrarArribo, type ResultadoLlegada } from '../api';
 import { obtenerNombreUsuarioActual } from '../../auth';
 
 // 1. Declarar la prop en la interfaz
@@ -11,7 +11,7 @@ interface CasetaArribosFormProps {
 // 2. Recibir la prop en el componente
 export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosFormProps) {
   const [numPedido, setNumPedido] = useState('');
-  const [resultado, setResultado] = useState<any>(null);
+  const [resultado, setResultado] = useState<ResultadoLlegada | null>(null);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
@@ -30,8 +30,8 @@ export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosF
       if (onArriboRegistrado) {
         onArriboRegistrado();
       }
-    } catch (err: any) {
-      setError(err.message || 'Error al registrar el arribo');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al registrar el arribo');
     } finally {
       setCargando(false);
     }
@@ -42,6 +42,7 @@ export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosF
       case 'A TIEMPO': return 'bg-success';
       case 'ANTICIPADO': return 'bg-warning text-dark';
       case 'TARDÍO': return 'bg-danger';
+      case 'AUSENTE': return 'bg-danger';
       default: return 'bg-secondary';
     }
   };
@@ -58,8 +59,9 @@ export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosF
         </div>
 
         <form onSubmit={handleSubmit} className="caseta-arribo-form">
-          <label className="form-label fw-semibold">Número de pedido</label>
+          <label htmlFor="caseta-numero-pedido" className="form-label fw-semibold">Número de pedido</label>
           <input
+            id="caseta-numero-pedido"
             type="text"
             className="form-control form-control-lg"
             placeholder="Ej. PED-1001"

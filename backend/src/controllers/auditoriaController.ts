@@ -5,14 +5,14 @@ interface RegistroAuditoriaInput {
   entidad: string;
   accion: string;
   detalle: string;
-  usuario?: string;
+  usuario: string;
 }
 
 export const registrarAuditoria = async ({
   entidad,
   accion,
   detalle,
-  usuario = 'Sistema',
+  usuario,
 }: RegistroAuditoriaInput): Promise<void> => {
   await Auditoria.create({
     entidad,
@@ -25,7 +25,7 @@ export const registrarAuditoria = async ({
 
 export const obtenerAuditorias = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const auditorias = await Auditoria.find().sort({ fecha: -1 }).limit(200);
+    const auditorias = await Auditoria.find({ activo: true }).sort({ fecha: -1 }).limit(200);
     res.status(200).json({ auditorias });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al consultar la auditoría', error });

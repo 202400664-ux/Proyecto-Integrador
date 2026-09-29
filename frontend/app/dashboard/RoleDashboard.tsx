@@ -115,6 +115,8 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
                 type="button"
                 className="dashboard-menu-button"
                 aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+                aria-expanded={sidebarOpen}
+                aria-controls="dashboard-navigation"
                 onClick={() => setSidebarOpen((prev) => !prev)}
               >
                 <span />
@@ -151,7 +153,7 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
             />
           )}
 
-          <aside className={`dashboard-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+          <aside id="dashboard-navigation" className={`dashboard-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
             <div className="dashboard-sidebar-header">
               <div className="dashboard-sidebar-brand">LOGÍSTICA</div>
             </div>

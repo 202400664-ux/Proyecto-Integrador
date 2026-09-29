@@ -12,17 +12,21 @@ const crearUsuarioSemilla = async () => {
     await mongoose.connect(MONGO_URI);
     console.log('Conectado a MongoDB...');
 
-    // Limpiar usuarios previos si existen
-    await Usuario.deleteMany({});
-    await Role.deleteMany({});
-
     const rolesBase: Array<{ nombre: RoleName; descripcion: string }> = [
       { nombre: 'administrador', descripcion: 'Acceso total al sistema' },
       { nombre: 'coordinador', descripcion: 'Gestion operativa y supervision' },
       { nombre: 'operador', descripcion: 'Acceso limitado a operaciones diarias' },
     ];
 
-    const roles = await Role.insertMany(rolesBase);
+    const roles = await Promise.all(
+      rolesBase.map(({ nombre, descripcion }) =>
+        Role.findOneAndUpdate(
+          { nombre },
+          { $set: { descripcion } },
+          { new: true, upsert: true, setDefaultsOnInsert: true }
+        )
+      )
+    );
     const rolesPorNombre = new Map(roles.map((role) => [role.nombre, role]));
 
     const usuariosPrueba: Array<{
@@ -42,14 +46,15 @@ const crearUsuarioSemilla = async () => {
         throw new Error(`Rol no encontrado: ${usuario.rol}`);
       }
 
-      const usuarioPrueba = new Usuario({
-        nombres: usuario.nombres,
-        apellidosCompleto: usuario.apellidosCompleto,
-        email: usuario.email,
-        password: '123456',
-        roles: [rol._id],
-        estado: 'activo',
-      });
+      let usuarioPrueba = await Usuario.findOne({ email: usuario.email });
+      if (!usuarioPrueba) {
+        usuarioPrueba = new Usuario({ email: usuario.email, password: '123456' });
+      }
+      usuarioPrueba.nombres = usuario.nombres;
+      usuarioPrueba.apellidosCompleto = usuario.apellidosCompleto;
+      usuarioPrueba.password = '123456';
+      usuarioPrueba.roles = [rol._id];
+      usuarioPrueba.estado = 'activo';
 
       await usuarioPrueba.save();
       console.log(`  ${usuario.email} | Contraseña: 123456 | Rol: ${usuario.rol}`);

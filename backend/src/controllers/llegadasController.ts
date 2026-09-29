@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Pedido } from '../models/Pedido.js';
 import { Parametro } from '../models/Parametro.js';
 import { registrarAuditoria } from './auditoriaController.js';
+import { validarNombreCompleto } from '../utils/usuario.js';
 
 /** Lee un parámetro numérico de tolerancia; si no existe, usa el valor por defecto. */
 async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Promise<number> {
@@ -14,6 +15,11 @@ async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Prom
 export const registrarLlegada = async (req: Request, res: Response): Promise<void> => {
   try {
     const { numeroPedido, usuarioNombre } = req.body;
+    const nombreUsuario = validarNombreCompleto(usuarioNombre);
+    if (!numeroPedido || !nombreUsuario) {
+      res.status(400).json({ mensaje: 'Número de pedido y nombre completo del usuario son obligatorios' });
+      return;
+    }
 
     const pedido = await Pedido.findOne({ numeroPedido, activo: true });
     if (!pedido) {
@@ -48,14 +54,14 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
     }
 
     pedido.estado = nuevoEstado;
-    pedido.usuarioActualizacion = usuarioNombre || 'Operador Caseta';
+    pedido.usuarioActualizacion = nombreUsuario;
     await pedido.save();
 
     await registrarAuditoria({
       entidad: 'Llegada',
       accion: 'registrar',
-      detalle: `Pedido ${pedido.numeroPedido} clasificado como ${nuevoEstado}. Ventana: ${new Date(pedido.inicioVentana).toISOString()} - ${new Date(pedido.finVentana).toISOString()}. Llegada real: ${fechaLlegadaReal.toISOString()}. Usuario: ${usuarioNombre || 'Operador Caseta'}`,
-      usuario: usuarioNombre || 'Operador Caseta',
+      detalle: `Pedido ${pedido.numeroPedido} clasificado como ${nuevoEstado}. Ventana: ${new Date(pedido.inicioVentana).toISOString()} - ${new Date(pedido.finVentana).toISOString()}. Llegada real: ${fechaLlegadaReal.toISOString()}. Usuario: ${nombreUsuario}`,
+      usuario: nombreUsuario,
     });
 
     res.status(200).json({
