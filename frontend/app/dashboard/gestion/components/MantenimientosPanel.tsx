@@ -57,7 +57,11 @@ export default function MantenimientosPanel() {
   };
 
   useEffect(() => {
-    cargarMantenimientos();
+    const cargarInicial = async () => {
+      await cargarMantenimientos();
+    };
+
+    void cargarInicial();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,36 +100,36 @@ export default function MantenimientosPanel() {
             <h2 className="h5 fw-bold mb-3">Registrar mantenimiento</h2>
             <div className="row g-3">
               <div className="col-md-6">
-                <label className="form-label">Número</label>
-                <input className="form-control" value={form.numeroOrden} onChange={(e) => setForm({ ...form, numeroOrden: e.target.value })} required />
+                <label htmlFor="mantenimiento-numero" className="form-label">Número</label>
+                <input id="mantenimiento-numero" className="form-control" value={form.numeroOrden} onChange={(e) => setForm({ ...form, numeroOrden: e.target.value })} required />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Tipo</label>
-                <select className="form-select" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value as typeof form.tipo })}>
+                <label htmlFor="mantenimiento-tipo" className="form-label">Tipo</label>
+                <select id="mantenimiento-tipo" className="form-select" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value as typeof form.tipo })}>
                   <option value="preventivo">Preventivo</option>
                   <option value="correctivo">Correctivo</option>
                   <option value="predictivo">Predictivo</option>
                 </select>
               </div>
               <div className="col-12">
-                <label className="form-label">Título</label>
-                <input className="form-control" value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} required />
+                <label htmlFor="mantenimiento-titulo" className="form-label">Título</label>
+                <input id="mantenimiento-titulo" className="form-control" value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} required />
               </div>
               <div className="col-12">
-                <label className="form-label">Descripción</label>
-                <textarea className="form-control" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required />
+                <label htmlFor="mantenimiento-descripcion" className="form-label">Descripción</label>
+                <textarea id="mantenimiento-descripcion" className="form-control" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Responsable</label>
-                <input className="form-control" value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} required />
+                <label htmlFor="mantenimiento-responsable" className="form-label">Responsable</label>
+                <input id="mantenimiento-responsable" className="form-control" value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} required />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Fecha programada</label>
-                <input type="datetime-local" className="form-control" value={form.fechaProgramada} onChange={(e) => setForm({ ...form, fechaProgramada: e.target.value })} required />
+                <label htmlFor="mantenimiento-fecha" className="form-label">Fecha programada</label>
+                <input id="mantenimiento-fecha" type="datetime-local" className="form-control" value={form.fechaProgramada} onChange={(e) => setForm({ ...form, fechaProgramada: e.target.value })} required />
               </div>
               <div className="col-12">
-                <label className="form-label">Observaciones</label>
-                <textarea className="form-control" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
+                <label htmlFor="mantenimiento-observaciones" className="form-label">Observaciones</label>
+                <textarea id="mantenimiento-observaciones" className="form-control" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
               </div>
             </div>
             <button className="btn btn-primary mt-3" type="submit">Guardar</button>
