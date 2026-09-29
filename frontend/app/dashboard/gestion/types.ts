@@ -21,7 +21,7 @@ export interface ProveedorRef {
 export interface Pedido {
   _id: string;
   numeroPedido: string;
-  proveedorId: ProveedorRef | string;
+  proveedorId: ProveedorRef | string | null;
   tipoProducto: Categoria;
   fechaHoraProgramada: string;
   inicioVentana: string;

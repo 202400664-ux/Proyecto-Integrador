@@ -13,7 +13,7 @@ export const obtenerParametros = async (_req: Request, res: Response): Promise<v
 
 export const crearParametro = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { clave, valor, descripcion, activo = true, usuarioCreacion } = req.body;
+    const { clave, valor, descripcion, activo = true } = req.body;
 
     if (!clave || !valor || !descripcion) {
       res.status(400).json({ mensaje: 'Los campos clave, valor y descripción son obligatorios' });
@@ -26,7 +26,7 @@ export const crearParametro = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const nombreUsuario = usuarioCreacion || 'Sistema';
+    const nombreUsuario = req.usuarioAutenticado!.nombreCompleto;
     const parametro = await Parametro.create({
       clave: String(clave).trim(),
       valor: String(valor),
@@ -40,7 +40,7 @@ export const crearParametro = async (req: Request, res: Response): Promise<void>
       entidad: 'Parametro',
       accion: 'crear',
       detalle: `Se creó el parámetro ${parametro.clave} con valor ${parametro.valor}`,
-      usuario: 'Sistema',
+      usuario: nombreUsuario,
     });
 
     res.status(201).json({ mensaje: 'Parámetro registrado correctamente', parametro });
@@ -52,7 +52,7 @@ export const crearParametro = async (req: Request, res: Response): Promise<void>
 export const actualizarParametro = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { valor, descripcion, activo, usuarioActualizacion } = req.body;
+    const { valor, descripcion, activo } = req.body;
 
     const parametro = await Parametro.findById(id);
     if (!parametro) {
@@ -64,14 +64,14 @@ export const actualizarParametro = async (req: Request, res: Response): Promise<
     if (descripcion !== undefined) parametro.descripcion = String(descripcion).trim();
     if (activo !== undefined) parametro.activo = Boolean(activo);
 
-    parametro.usuarioActualizacion = usuarioActualizacion || 'Sistema';
+    parametro.usuarioActualizacion = req.usuarioAutenticado!.nombreCompleto;
     await parametro.save();
 
     await registrarAuditoria({
       entidad: 'Parametro',
       accion: 'actualizar',
       detalle: `Se actualizó el parámetro ${parametro.clave}`,
-      usuario: 'Sistema',
+      usuario: req.usuarioAutenticado!.nombreCompleto,
     });
 
     res.status(200).json({ mensaje: 'Parámetro actualizado correctamente', parametro });
@@ -84,7 +84,7 @@ export const inactivarParametro = async (req: Request, res: Response): Promise<v
   try {
     const parametro = await Parametro.findOneAndUpdate(
       { _id: req.params.id, activo: true },
-      { $set: { activo: false, usuarioActualizacion: req.body?.usuarioActualizacion || 'Sistema' } },
+      { $set: { activo: false, usuarioActualizacion: req.usuarioAutenticado!.nombreCompleto } },
       { new: true }
     );
 
@@ -97,7 +97,7 @@ export const inactivarParametro = async (req: Request, res: Response): Promise<v
       entidad: 'Parametro',
       accion: 'inactivar',
       detalle: `Se inactivó lógicamente el parámetro ${parametro.clave}`,
-      usuario: 'Sistema',
+      usuario: req.usuarioAutenticado!.nombreCompleto,
     });
 
     res.status(200).json({ mensaje: 'Parámetro inactivado correctamente', parametro });

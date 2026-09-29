@@ -13,9 +13,9 @@ async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Prom
 
 export const registrarLlegada = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { numeroPedido, usuarioNombre } = req.body;
+    const { numeroPedido } = req.body;
 
-    const pedido = await Pedido.findOne({ numeroPedido, activo: true });
+    const pedido = await Pedido.findOne({ numeroPedido, activo: { $ne: false }, estado: { $ne: 'CANCELADO' } });
     if (!pedido) {
       res.status(404).json({ mensaje: 'Pedido no encontrado o inactivo.' });
       return;
@@ -48,14 +48,15 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
     }
 
     pedido.estado = nuevoEstado;
-    pedido.usuarioActualizacion = usuarioNombre || 'Operador Caseta';
+    const actor = req.usuarioAutenticado!.nombreCompleto;
+    pedido.usuarioActualizacion = actor;
     await pedido.save();
 
     await registrarAuditoria({
       entidad: 'Llegada',
       accion: 'registrar',
-      detalle: `Pedido ${pedido.numeroPedido} clasificado como ${nuevoEstado}. Ventana: ${new Date(pedido.inicioVentana).toISOString()} - ${new Date(pedido.finVentana).toISOString()}. Llegada real: ${fechaLlegadaReal.toISOString()}. Usuario: ${usuarioNombre || 'Operador Caseta'}`,
-      usuario: usuarioNombre || 'Operador Caseta',
+      detalle: `Pedido ${pedido.numeroPedido} clasificado como ${nuevoEstado}. Ventana: ${new Date(pedido.inicioVentana).toISOString()} - ${new Date(pedido.finVentana).toISOString()}. Llegada real: ${fechaLlegadaReal.toISOString()}. Usuario: ${actor}`,
+      usuario: actor,
     });
 
     res.status(200).json({
@@ -80,7 +81,7 @@ export async function marcarPedidosAusentes(): Promise<void> {
 
   await Pedido.updateMany(
     {
-      activo: true,
+      activo: { $ne: false },
       estado: 'PROGRAMADO',
       $or: [
         { fechaHoraLlegadaReal: { $exists: false } },

@@ -9,6 +9,7 @@ interface PedidosTableProps {
 }
 
 function nombreProveedor(proveedorId: Pedido['proveedorId'], proveedores: ProveedorRef[]): string {
+  if (!proveedorId) return 'Proveedor no disponible';
   if (typeof proveedorId === 'string') {
     return proveedores.find((proveedor) => proveedor._id === proveedorId)?.razonSocial ?? proveedorId;
   }

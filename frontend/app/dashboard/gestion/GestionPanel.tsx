@@ -28,14 +28,21 @@ export default function GestionPanel() {
   const [pestana, setPestana] = useState<Pestana>('inicio');
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [proveedoresTabla, setProveedoresTabla] = useState<Proveedor[]>([]);
   const [cargandoProveedores, setCargandoProveedores] = useState(true);
+  const [categoriaProveedor, setCategoriaProveedor] = useState('');
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [cargandoPedidos, setCargandoPedidos] = useState(true);
 
   const [errorCarga, setErrorCarga] = useState('');
+  const [mensajeProveedor, setMensajeProveedor] = useState('');
   const [proveedorEditar, setProveedorEditar] = useState<Proveedor | null>(null);
   const [pedidoEditar, setPedidoEditar] = useState<Pedido | null>(null);
+
+  const navegarA = (destino: Exclude<Pestana, 'inicio'>) => {
+    window.dispatchEvent(new CustomEvent('dashboard:select-tab', { detail: destino }));
+  };
 
   useEffect(() => {
     let activo = true;
@@ -48,6 +55,7 @@ export default function GestionPanel() {
         ]);
         if (!activo) return;
         setProveedores(listaProveedores);
+        setProveedoresTabla(listaProveedores);
         setPedidos(listaPedidos);
       } catch {
         if (!activo) return;
@@ -66,6 +74,28 @@ export default function GestionPanel() {
       activo = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!categoriaProveedor) return;
+
+    let activo = true;
+    const cargarProveedores = async () => {
+      setCargandoProveedores(true);
+      try {
+        const lista = await obtenerProveedores(categoriaProveedor as Proveedor['categoria']);
+        if (activo) setProveedoresTabla(lista);
+      } catch (error) {
+        if (activo) setErrorCarga(error instanceof Error ? error.message : 'No se pudieron cargar los proveedores');
+      } finally {
+        if (activo) setCargandoProveedores(false);
+      }
+    };
+
+    void cargarProveedores();
+    return () => {
+      activo = false;
+    };
+  }, [categoriaProveedor, proveedores]);
 
   useEffect(() => {
     const onShowHome = () => setPestana('inicio');
@@ -90,69 +120,85 @@ export default function GestionPanel() {
       {errorCarga && <div className="alert alert-danger">{errorCarga}</div>}
 
       {pestana === 'inicio' && (
-        <div className="welcome-panel card p-4 shadow-sm border-0">
-          <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <section className="welcome-panel dashboard-home">
+          <div className="dashboard-home-header">
             <div>
-              <p className="text-uppercase mb-2 fw-bold" style={{ letterSpacing: '0.14em', color: '#F1BD4B' }}>Panel principal</p>
-              <h2 className="mb-0" style={{ color: '#123149' }}>Bienvenido al sistema</h2>
+              <p className="dashboard-home-kicker">Centro de distribución</p>
+              <h2>Resumen operativo</h2>
             </div>
-            <span className="badge bg-light text-primary px-3 py-2">Dashboard operativo</span>
           </div>
           <div className="row g-3">
             <div className="col-md-4">
-              <div className="card h-100 border-0 bg-light">
-                <div className="card-body">
-                  <h3 className="h6 fw-bold text-primary">Proveedores</h3>
-                  <p className="mb-0 text-secondary">Administra altas, estados y contacto de proveedores.</p>
-                </div>
-              </div>
+              <button type="button" className="dashboard-home-tile" onClick={() => navegarA('proveedores')}>
+                <span>Proveedores activos</span>
+                <strong>{proveedores.length}</strong>
+                <small>Administrar proveedores</small>
+              </button>
             </div>
             <div className="col-md-4">
-              <div className="card h-100 border-0 bg-light">
-                <div className="card-body">
-                  <h3 className="h6 fw-bold text-primary">Pedidos</h3>
-                  <p className="mb-0 text-secondary">Programación de ventanas, traslapes y alternativas.</p>
-                </div>
-              </div>
+              <button type="button" className="dashboard-home-tile" onClick={() => navegarA('pedidos')}>
+                <span>Pedidos en agenda</span>
+                <strong>{pedidos.length}</strong>
+                <small>Ver programación</small>
+              </button>
             </div>
             <div className="col-md-4">
-              <div className="card h-100 border-0 bg-light">
-                <div className="card-body">
-                  <h3 className="h6 fw-bold text-primary">Caseta</h3>
-                  <p className="mb-0 text-secondary">Registro de arribos y clasificación por tolerancia.</p>
-                </div>
-              </div>
+              <button type="button" className="dashboard-home-tile" onClick={() => navegarA('caseta')}>
+                <span>Arribos por registrar</span>
+                <strong>{pedidos.filter((pedido) => pedido.estado === 'PROGRAMADO').length}</strong>
+                <small>Abrir caseta</small>
+              </button>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
       {pestana === 'proveedores' && (
         <>
           {puede('proveedores.crear') && (
             <ProveedorForm
+              key={proveedorEditar?._id ?? 'nuevo'}
               proveedorEditar={proveedorEditar}
+              onResultado={setMensajeProveedor}
               onCancelarEdicion={() => setProveedorEditar(null)}
               onProveedorActualizado={(actualizado) => {
                 setProveedores((prev) => prev.map((item) => item._id === actualizado._id ? actualizado : item));
+                setProveedoresTabla((prev) => prev.flatMap((item) => {
+                  if (item._id !== actualizado._id) return [item];
+                  return !categoriaProveedor || actualizado.categoria === categoriaProveedor ? [actualizado] : [];
+                }));
                 setProveedorEditar(null);
               }}
-              onProveedorCreado={(nuevo) =>
-                setProveedores((prev) =>
-                  [...prev, nuevo].sort((a, b) => a.razonSocial.localeCompare(b.razonSocial))
-                )
-              }
+              onProveedorCreado={(nuevo) => {
+                setProveedores((prev) => [...prev, nuevo].sort((a, b) => a.razonSocial.localeCompare(b.razonSocial)));
+                if (!categoriaProveedor || nuevo.categoria === categoriaProveedor) {
+                  setProveedoresTabla((prev) => [...prev, nuevo].sort((a, b) => a.razonSocial.localeCompare(b.razonSocial)));
+                }
+              }}
             />
           )}
+          {mensajeProveedor && <div className="alert alert-success" role="status">{mensajeProveedor}</div>}
           <ProveedoresTable
-            proveedores={proveedores}
+            proveedores={categoriaProveedor ? proveedoresTabla : proveedores}
             cargando={cargandoProveedores}
-            onEditar={setProveedorEditar}
+            categoriaFiltro={categoriaProveedor}
+            onCategoriaFiltroChange={(categoria) => {
+              setCategoriaProveedor(categoria);
+              if (!categoria) setCargandoProveedores(false);
+            }}
+            onEditar={(proveedor) => {
+              setMensajeProveedor('');
+              setProveedorEditar(proveedor);
+            }}
             onInactivar={async (id) => {
               if (!window.confirm('¿Inactivar este proveedor?')) return;
               try {
+                const proveedor = proveedores.find((item) => item._id === id);
                 await inactivarProveedor(id);
                 setProveedores((prev) => prev.filter((item) => item._id !== id));
+                setProveedoresTabla((prev) => prev.filter((item) => item._id !== id));
+                setProveedorEditar((actual) => actual?._id === id ? null : actual);
+                setMensajeProveedor(`Proveedor "${proveedor?.razonSocial ?? id}" inactivado correctamente.`);
               } catch (error) {
                 setErrorCarga(error instanceof Error ? error.message : 'No se pudo inactivar el proveedor');
               }
@@ -165,6 +211,7 @@ export default function GestionPanel() {
         <>
           {puede('pedidos.crear') && (
             <PedidoForm
+              key={pedidoEditar?._id ?? 'nuevo'}
               proveedores={proveedores}
               pedidoEditar={pedidoEditar}
               onCancelarEdicion={() => setPedidoEditar(null)}

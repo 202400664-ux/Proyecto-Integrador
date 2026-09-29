@@ -3,21 +3,36 @@ import type { Proveedor } from '../types';
 interface ProveedoresTableProps {
   proveedores: Proveedor[];
   cargando: boolean;
+  categoriaFiltro: string;
+  onCategoriaFiltroChange: (categoria: string) => void;
   onEditar: (proveedor: Proveedor) => void;
   onInactivar: (id: string) => void;
 }
 
-export default function ProveedoresTable({ proveedores, cargando, onEditar, onInactivar }: ProveedoresTableProps) {
+export default function ProveedoresTable({ proveedores, cargando, categoriaFiltro, onCategoriaFiltroChange, onEditar, onInactivar }: ProveedoresTableProps) {
   return (
     <div className="card p-4 shadow-sm border-0">
-      <h2 className="h5 fw-bold mb-3" style={{ color: '#123149' }}>
-        Proveedores registrados
-      </h2>
+      <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-3">
+        <h2 className="h5 fw-bold mb-0" style={{ color: '#123149' }}>Proveedores registrados</h2>
+        <div className="d-flex align-items-center gap-2">
+          <label htmlFor="filtro-categoria-proveedor" className="form-label mb-0">Categoría</label>
+          <select
+            id="filtro-categoria-proveedor"
+            className="form-select"
+            value={categoriaFiltro}
+            onChange={(event) => onCategoriaFiltroChange(event.target.value)}
+          >
+            <option value="">Todas</option>
+            <option value="construcción">Construcción</option>
+            <option value="general">General</option>
+          </select>
+        </div>
+      </div>
 
       {cargando ? (
         <p className="text-secondary mb-0">Cargando proveedores...</p>
       ) : proveedores.length === 0 ? (
-        <p className="text-secondary mb-0">Aún no hay proveedores registrados.</p>
+        <p className="text-secondary mb-0">{categoriaFiltro ? 'No hay proveedores en esta categoría.' : 'Aún no hay proveedores registrados.'}</p>
       ) : (
         <div className="table-responsive">
           <table className="table table-sm align-middle">

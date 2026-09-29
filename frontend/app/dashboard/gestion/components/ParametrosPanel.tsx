@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { API_BASE_URL, ApiError } from '../api';
-import { obtenerNombreUsuarioActual } from '../../auth';
+import { API_BASE_URL, ApiError, encabezadosAutenticados } from '../api';
 
 interface Parametro {
   _id: string;
@@ -52,8 +51,8 @@ export default function ParametrosPanel({ puedeGestionar }: ParametrosPanelProps
   const guardar = async (id: string) => {
     const response = await fetch(`${API_BASE_URL}/parametros/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ valor, descripcion, usuarioActualizacion: obtenerNombreUsuarioActual() }),
+      headers: { 'Content-Type': 'application/json', ...encabezadosAutenticados() },
+      body: JSON.stringify({ valor, descripcion }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || 'No se pudo actualizar el parámetro');
@@ -65,8 +64,7 @@ export default function ParametrosPanel({ puedeGestionar }: ParametrosPanelProps
     if (!window.confirm('¿Inactivar este parámetro? Se conservará en la base de datos.')) return;
     const response = await fetch(`${API_BASE_URL}/parametros/${id}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usuarioActualizacion: obtenerNombreUsuarioActual() }),
+      headers: encabezadosAutenticados(),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || 'No se pudo inactivar el parámetro');
@@ -81,12 +79,11 @@ export default function ParametrosPanel({ puedeGestionar }: ParametrosPanelProps
     try {
       const response = await fetch(`${API_BASE_URL}/parametros`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...encabezadosAutenticados() },
         body: JSON.stringify({
           clave,
           valor: nuevoValor,
           descripcion: nuevaDescripcion,
-          usuarioCreacion: obtenerNombreUsuarioActual(),
         }),
       });
       const data = await response.json();

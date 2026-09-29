@@ -5,17 +5,7 @@ import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
 import { esRolValido, type Rol } from './permisos';
 import { RolProvider } from './RolContext';
-
-const MENU_ITEMS = [
-  { key: 'inicio', label: 'Inicio', icon: '⌂' },
-  { key: 'proveedores', label: 'Proveedores', icon: '▣' },
-  { key: 'pedidos', label: 'Pedidos', icon: '▤' },
-  { key: 'caseta', label: 'Caseta', icon: '◫' },
-  { key: 'mantenimientos', label: 'Mantenimientos', icon: '◧' },
-  { key: 'auditoria', label: 'Auditoría', icon: '◌' },
-] as const;
-
-const PARAMETROS_MENU_ITEM = { key: 'parametros', label: 'Parámetros', icon: '⚙' } as const;
+import Sidebar, { type PestanaDashboard } from './gestion/components/Sidebar';
 
 interface DecodedToken {
   rol: Rol;
@@ -78,6 +68,7 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
   const rol = useSyncExternalStore(subscribeToSession, readRoleFromToken, () => null);
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pestanaActiva, setPestanaActiva] = useState<PestanaDashboard>('inicio');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -96,11 +87,34 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
     return () => window.removeEventListener('popstate', onPopState);
   }, [router]);
 
+  useEffect(() => {
+    const onShowHome = () => setPestanaActiva('inicio');
+    const onSelectTab = (event: Event) => {
+      const pestana = (event as CustomEvent<PestanaDashboard>).detail;
+      if (pestana) setPestanaActiva(pestana);
+    };
+
+    window.addEventListener('dashboard:show-home', onShowHome);
+    window.addEventListener('dashboard:select-tab', onSelectTab as EventListener);
+    return () => {
+      window.removeEventListener('dashboard:show-home', onShowHome);
+      window.removeEventListener('dashboard:select-tab', onSelectTab as EventListener);
+    };
+  }, []);
+
   const handleLogout = () => {
     removeStoredSession();
     window.dispatchEvent(new Event('sessionchange'));
     window.history.replaceState(null, '', '/');
     router.replace('/');
+  };
+
+  const navegar = (pestana: PestanaDashboard) => {
+    if (pestana === 'inicio') {
+      window.dispatchEvent(new Event('dashboard:show-home'));
+    } else {
+      window.dispatchEvent(new CustomEvent('dashboard:select-tab', { detail: pestana }));
+    }
   };
 
   if (!rol) return null;
@@ -115,6 +129,8 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
                 type="button"
                 className="dashboard-menu-button"
                 aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+                aria-expanded={sidebarOpen}
+                aria-controls="dashboard-sidebar"
                 onClick={() => setSidebarOpen((prev) => !prev)}
               >
                 <span />
@@ -151,32 +167,13 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
             />
           )}
 
-          <aside className={`dashboard-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-            <div className="dashboard-sidebar-header">
-              <div className="dashboard-sidebar-brand">LOGÍSTICA</div>
-            </div>
-
-            <nav className="dashboard-sidebar-nav">
-              {[...MENU_ITEMS, ...(rol === 'administrador' ? [PARAMETROS_MENU_ITEM] : [])].map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  className="dashboard-nav-item"
-                  onClick={() => {
-                    if (item.key === 'inicio') {
-                      window.dispatchEvent(new Event('dashboard:show-home'));
-                    } else {
-                      window.dispatchEvent(new CustomEvent('dashboard:select-tab', { detail: item.key }));
-                    }
-                    setSidebarOpen(false);
-                  }}
-                >
-                  <span className="dashboard-nav-icon">{item.icon}</span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </nav>
-          </aside>
+          <Sidebar
+            rol={rol}
+            abierto={sidebarOpen}
+            pestanaActiva={pestanaActiva}
+            onNavegar={navegar}
+            onCerrar={() => setSidebarOpen(false)}
+          />
 
           <div className="dashboard-panel">{children}</div>
         </main>

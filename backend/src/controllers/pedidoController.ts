@@ -1,44 +1,66 @@
 import { Request, Response } from 'express';
+import { isValidObjectId } from 'mongoose';
 import { Pedido } from '../models/Pedido.js';
 import { Proveedor } from '../models/Proveedor.js';
+import { Parametro } from '../models/Parametro.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { marcarPedidosAusentes } from './llegadasController.js';
 
-// --- Configuración del horario operativo del centro de distribución ---
-const HORARIO_OPERATIVO = {
-  // 0 = domingo, 1 = lunes, ..., 6 = sábado
-  1: { inicio: 7, fin: 17 },  // lunes: 7:00 - 17:00
-  2: { inicio: 7, fin: 17 },  // martes
-  3: { inicio: 7, fin: 17 },  // miércoles
-  4: { inicio: 7, fin: 17 },  // jueves
-  5: { inicio: 7, fin: 17 },  // viernes
-  6: { inicio: 7, fin: 17 },  // sábado: 7:00 - 17:00
-} as Record<number, { inicio: number; fin: number }>;
-// domingo (0) no aparece = cerrado
+interface HorarioOperativo {
+  inicio: number;
+  fin: number;
+}
 
-const horaDecimal = (fecha: Date): number => fecha.getHours() + fecha.getMinutes() / 60;
+const HORARIO_POR_DEFECTO: HorarioOperativo = { inicio: 7 * 60, fin: 17 * 60 };
+const CLAVES_HORARIO = ['horario_inicio_operativo', 'horario_fin_operativo'] as const;
 
-const dentroDelHorarioOperativo = (inicio: Date, fin: Date): boolean => {
+function minutosDesdeMedianoche(valor: string | undefined, porDefecto: number): number {
+  if (!valor) return porDefecto;
+  const texto = valor.trim();
+  const formatoHora = /^(\d{1,2}):([0-5]\d)$/.exec(texto);
+  if (formatoHora) {
+    const hora = Number(formatoHora[1]);
+    return hora <= 24 && (hora < 24 || Number(formatoHora[2]) === 0)
+      ? hora * 60 + Number(formatoHora[2])
+      : porDefecto;
+  }
+
+  const horaNumerica = Number(texto);
+  return Number.isFinite(horaNumerica) && horaNumerica >= 0 && horaNumerica <= 24
+    ? horaNumerica * 60
+    : porDefecto;
+}
+
+async function obtenerHorarioOperativo(): Promise<HorarioOperativo> {
+  const parametros = await Parametro.find({ clave: { $in: CLAVES_HORARIO }, activo: true });
+  const valores = new Map(parametros.map((parametro) => [parametro.clave, parametro.valor]));
+  const horario = {
+    inicio: minutosDesdeMedianoche(valores.get('horario_inicio_operativo'), HORARIO_POR_DEFECTO.inicio),
+    fin: minutosDesdeMedianoche(valores.get('horario_fin_operativo'), HORARIO_POR_DEFECTO.fin),
+  };
+  return horario.inicio < horario.fin ? horario : HORARIO_POR_DEFECTO;
+}
+
+const dentroDelHorarioOperativo = (inicio: Date, fin: Date, horario: HorarioOperativo): boolean => {
   const dia = inicio.getDay();
-  const horario = HORARIO_OPERATIVO[dia];
-  if (!horario) return false; // domingo, o cualquier día sin horario definido
+  if (dia === 0 || !Number.isFinite(inicio.getTime()) || !Number.isFinite(fin.getTime())) return false;
 
   // La ventana completa debe caer el mismo día y dentro del rango permitido
   if (fin.getDay() !== dia) return false;
-  return horaDecimal(inicio) >= horario.inicio && horaDecimal(fin) <= horario.fin;
+  const horaInicio = inicio.getHours() * 60 + inicio.getMinutes();
+  const horaFin = fin.getHours() * 60 + fin.getMinutes();
+  return horaInicio >= horario.inicio && horaFin <= horario.fin;
 };
-
-// Revisa si dos ventanas de tiempo se traslapan
-const seTraslapan = (inicioA: Date, finA: Date, inicioB: Date, finB: Date): boolean =>
-  inicioA < finB && inicioB < finA;
 
 // Genera hasta 3 ventanas alternativas de la misma duración en días operativos.
 const generarAlternativas = async (
   inicioSolicitado: Date,
   duracionMinutos: number,
+  horario: HorarioOperativo,
   excluirPedidoId?: string
 ): Promise<{ inicioVentana: Date; finVentana: Date }[]> => {
-  const primerDia = new Date(inicioSolicitado);
+  const primerInicio = new Date(Math.max(inicioSolicitado.getTime(), Date.now()));
+  const primerDia = new Date(primerInicio);
   primerDia.setHours(0, 0, 0, 0);
   const limiteBusqueda = new Date(primerDia);
   limiteBusqueda.setDate(limiteBusqueda.getDate() + 90);
@@ -47,9 +69,10 @@ const generarAlternativas = async (
   const alternativas: { inicioVentana: Date; finVentana: Date }[] = [];
   if (duracionMs <= 0) return alternativas;
 
-  const inicioBusqueda = new Date(inicioSolicitado);
+  const inicioBusqueda = new Date(primerInicio);
   inicioBusqueda.setHours(0, 0, 0, 0);
   const pedidosDelDia = await Pedido.find({
+    activo: { $ne: false },
     estado: { $ne: 'CANCELADO' },
     inicioVentana: { $gte: inicioBusqueda, $lt: limiteBusqueda },
     ...(excluirPedidoId ? { _id: { $ne: excluirPedidoId } } : {}),
@@ -67,17 +90,16 @@ const generarAlternativas = async (
   for (let desplazamiento = 0; desplazamiento < 90 && alternativas.length < 3; desplazamiento += 1) {
     const fechaDia = new Date(primerDia);
     fechaDia.setDate(fechaDia.getDate() + desplazamiento);
-    const horario = HORARIO_OPERATIVO[fechaDia.getDay()];
-    if (!horario) continue;
+    if (fechaDia.getDay() === 0) continue;
 
     const inicioDelDia = new Date(fechaDia);
-    inicioDelDia.setHours(horario.inicio, 0, 0, 0);
+    inicioDelDia.setHours(Math.floor(horario.inicio / 60), horario.inicio % 60, 0, 0);
     const finDelDia = new Date(fechaDia);
-    finDelDia.setHours(horario.fin, 0, 0, 0);
+    finDelDia.setHours(Math.floor(horario.fin / 60), horario.fin % 60, 0, 0);
     if (duracionMs > finDelDia.getTime() - inicioDelDia.getTime()) continue;
 
-    let cursor = desplazamiento === 0 && inicioSolicitado > inicioDelDia
-      ? new Date(inicioSolicitado)
+    let cursor = desplazamiento === 0 && primerInicio > inicioDelDia
+      ? new Date(primerInicio)
       : inicioDelDia;
     const clave = `${fechaDia.getFullYear()}-${fechaDia.getMonth()}-${fechaDia.getDate()}`;
 
@@ -114,7 +136,6 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       inicioVentana,
       finVentana,
       duracionEstimadaMinutos,
-      usuarioCreacion,
     } = req.body;
 
     // Validación de campos requeridos
@@ -128,15 +149,24 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    if (duracionEstimadaMinutos <= 0) {
+    const duracionMinutos = Number(duracionEstimadaMinutos);
+    if (!Number.isFinite(duracionMinutos) || duracionMinutos <= 0) {
       res.status(400).json({ mensaje: 'La duración estimada debe ser mayor a cero' });
       return;
     }
 
-    // --- RN-01: el proveedor debe existir ---
-    const proveedor = await Proveedor.findById(proveedorId);
+    // --- RN-01: el proveedor debe existir y estar activo ---
+    if (!isValidObjectId(proveedorId)) {
+      res.status(400).json({ mensaje: 'El ID del proveedor no es válido' });
+      return;
+    }
+    const proveedor = await Proveedor.findOne({ _id: proveedorId, activo: true, estado: 'activo' });
     if (!proveedor) {
-      res.status(404).json({ mensaje: 'El proveedor indicado no está registrado' });
+      res.status(400).json({ mensaje: 'El proveedor indicado no existe o está inactivo' });
+      return;
+    }
+    if (tipoProducto !== proveedor.categoria) {
+      res.status(400).json({ mensaje: 'El tipo de producto debe coincidir con la categoría del proveedor' });
       return;
     }
 
@@ -152,32 +182,32 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
     // exactamente con duracionEstimadaMinutos — son 2 campos independientes
     // que el usuario podría llenar de forma inconsistente.
     const duracionRealMinutos = (fin.getTime() - inicio.getTime()) / 60000;
-    if (duracionRealMinutos !== Number(duracionEstimadaMinutos)) {
+    if (duracionRealMinutos !== duracionMinutos) {
       res.status(400).json({
-        mensaje: `La ventana (${duracionRealMinutos} min) no coincide con la duración estimada declarada (${duracionEstimadaMinutos} min)`,
+        mensaje: `La ventana (${duracionRealMinutos} min) no coincide con la duración estimada declarada (${duracionMinutos} min)`,
       });
       return;
     }
-    
+
+    const horario = await obtenerHorarioOperativo();
     // --- RN-02a: dentro del horario operativo ---
-    if (!dentroDelHorarioOperativo(inicio, fin)) {
+    if (!dentroDelHorarioOperativo(inicio, fin, horario)) {
       res.status(400).json({
         mensaje: 'La ventana solicitada está fuera del horario operativo del centro logístico',
       });
       return;
     }
 
-   // --- RN-02b: sin solapamiento con otro pedido ya programado ---
-    const pedidosDelDia = await Pedido.find({
+    // --- RN-02b: sin solapamiento con otro pedido ya programado ---
+    const pedidoEnConflicto = await Pedido.findOne({
+      activo: { $ne: false },
       estado: { $ne: 'CANCELADO' },
+      inicioVentana: { $lt: fin },
+      finVentana: { $gt: inicio },
     });
 
-    const pedidoEnConflicto = pedidosDelDia.find((pedido) =>
-      seTraslapan(inicio, fin, new Date(pedido.inicioVentana), new Date(pedido.finVentana))
-    );
-
     if (pedidoEnConflicto) {
-      const alternativas = await generarAlternativas(inicio, duracionEstimadaMinutos);
+      const alternativas = await generarAlternativas(inicio, duracionMinutos, horario);
       res.status(409).json({
         mensaje: 'La ventana solicitada se traslapa con otro pedido ya programado',
         conflictoCon: {
@@ -204,17 +234,17 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       fechaHoraProgramada: new Date(fechaHoraProgramada),
       inicioVentana: inicio,
       finVentana: fin,
-      duracionEstimadaMinutos,
+      duracionEstimadaMinutos: duracionMinutos,
       estado: 'PROGRAMADO',
-      usuarioCreacion: usuarioCreacion || 'Sistema',
-      usuarioActualizacion: usuarioCreacion || 'Sistema',
+      usuarioCreacion: req.usuarioAutenticado!.nombreCompleto,
+      usuarioActualizacion: req.usuarioAutenticado!.nombreCompleto,
     });
 
     await registrarAuditoria({
       entidad: 'Pedido',
       accion: 'crear',
       detalle: `Se programó el pedido ${nuevoPedido.numeroPedido} con ventana ${inicio.toISOString()} - ${fin.toISOString()}`,
-      usuario: 'Sistema',
+      usuario: req.usuarioAutenticado!.nombreCompleto,
     });
 
     res.status(201).json({
@@ -229,7 +259,9 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
 export const obtenerPedidos = async (req: Request, res: Response): Promise<void> => {
   try {
     await marcarPedidosAusentes(); // Revisa y marca AUSENTE antes de listar
-    const pedidos = await Pedido.find({ activo: true }).populate('proveedorId').sort({ inicioVentana: 1 });
+    const pedidos = await Pedido.find({ activo: { $ne: false }, estado: { $ne: 'CANCELADO' } })
+      .populate('proveedorId')
+      .sort({ inicioVentana: 1 });
     res.status(200).json({ pedidos });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error interno en el servidor', error });
@@ -238,7 +270,7 @@ export const obtenerPedidos = async (req: Request, res: Response): Promise<void>
 
 export const actualizarPedido = async (req: Request, res: Response): Promise<void> => {
   try {
-    const pedido = await Pedido.findOne({ _id: req.params.id, activo: true });
+    const pedido = await Pedido.findOne({ _id: req.params.id, activo: { $ne: false }, estado: { $ne: 'CANCELADO' } });
     if (!pedido) {
       res.status(404).json({ mensaje: 'Pedido no encontrado o inactivo' });
       return;
@@ -248,37 +280,89 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const { proveedorId, tipoProducto, inicioVentana, finVentana, duracionEstimadaMinutos } = req.body;
-    if (proveedorId !== undefined) {
-      const proveedor = await Proveedor.findById(proveedorId);
-      if (!proveedor || !proveedor.activo) {
-        res.status(400).json({ mensaje: 'El proveedor indicado no existe o está inactivo' });
-        return;
-      }
-      (pedido as any).proveedorId = proveedor._id;
+    const proveedorId = req.body.proveedorId ?? String(pedido.proveedorId);
+    if (!isValidObjectId(proveedorId)) {
+      res.status(400).json({ mensaje: 'El ID del proveedor no es válido' });
+      return;
     }
-    if (tipoProducto !== undefined) (pedido as any).tipoProducto = tipoProducto;
-    if (inicioVentana !== undefined) (pedido as any).inicioVentana = new Date(inicioVentana);
-    if (finVentana !== undefined) (pedido as any).finVentana = new Date(finVentana);
-    if (duracionEstimadaMinutos !== undefined) (pedido as any).duracionEstimadaMinutos = Number(duracionEstimadaMinutos);
+    const proveedor = await Proveedor.findOne({ _id: proveedorId, activo: true, estado: 'activo' });
+    if (!proveedor) {
+      res.status(400).json({ mensaje: 'El proveedor indicado no existe o está inactivo' });
+      return;
+    }
 
-    if (pedido.finVentana <= pedido.inicioVentana) {
+    const tipoProducto = req.body.tipoProducto ?? pedido.tipoProducto;
+    if (!['construcción', 'general'].includes(tipoProducto)) {
+      res.status(400).json({ mensaje: 'El tipo de producto debe ser "construcción" o "general"' });
+      return;
+    }
+    if (tipoProducto !== proveedor.categoria) {
+      res.status(400).json({ mensaje: 'El tipo de producto debe coincidir con la categoría del proveedor' });
+      return;
+    }
+
+    const inicio = req.body.inicioVentana !== undefined ? new Date(req.body.inicioVentana) : new Date(pedido.inicioVentana);
+    const fin = req.body.finVentana !== undefined ? new Date(req.body.finVentana) : new Date(pedido.finVentana);
+    const duracionMinutos = req.body.duracionEstimadaMinutos !== undefined
+      ? Number(req.body.duracionEstimadaMinutos)
+      : pedido.duracionEstimadaMinutos;
+
+    if (!Number.isFinite(duracionMinutos) || duracionMinutos <= 0) {
+      res.status(400).json({ mensaje: 'La duración estimada debe ser mayor a cero' });
+      return;
+    }
+    if (!Number.isFinite(inicio.getTime()) || !Number.isFinite(fin.getTime()) || fin <= inicio) {
       res.status(400).json({ mensaje: 'finVentana debe ser posterior a inicioVentana' });
       return;
     }
-    if (!dentroDelHorarioOperativo(pedido.inicioVentana, pedido.finVentana)) {
-      res.status(400).json({ mensaje: 'La ventana debe estar entre 07:00 y 17:00, de lunes a sábado' });
+
+    const duracionRealMinutos = (fin.getTime() - inicio.getTime()) / 60000;
+    if (duracionRealMinutos !== duracionMinutos) {
+      res.status(400).json({ mensaje: 'La ventana no coincide con la duración estimada declarada' });
       return;
     }
+
+    const horario = await obtenerHorarioOperativo();
+    if (!dentroDelHorarioOperativo(inicio, fin, horario)) {
+      res.status(400).json({ mensaje: 'La ventana está fuera del horario operativo, de lunes a sábado' });
+      return;
+    }
+
+    const pedidoEnConflicto = await Pedido.findOne({
+      _id: { $ne: pedido._id },
+      activo: { $ne: false },
+      estado: { $ne: 'CANCELADO' },
+      inicioVentana: { $lt: fin },
+      finVentana: { $gt: inicio },
+    });
+    if (pedidoEnConflicto) {
+      const alternativas = await generarAlternativas(inicio, duracionMinutos, horario, String(pedido._id));
+      res.status(409).json({
+        mensaje: 'La ventana solicitada se traslapa con otro pedido ya programado',
+        conflictoCon: {
+          numeroPedido: pedidoEnConflicto.numeroPedido,
+          inicioVentana: pedidoEnConflicto.inicioVentana,
+          finVentana: pedidoEnConflicto.finVentana,
+        },
+        ventanasAlternativas: alternativas,
+      });
+      return;
+    }
+
+    pedido.proveedorId = proveedor._id;
+    pedido.tipoProducto = tipoProducto;
+    pedido.inicioVentana = inicio;
+    pedido.finVentana = fin;
+    pedido.duracionEstimadaMinutos = duracionMinutos;
     pedido.fechaHoraProgramada = pedido.inicioVentana;
-    pedido.usuarioActualizacion = req.body.usuarioActualizacion || 'Sistema';
+    pedido.usuarioActualizacion = req.usuarioAutenticado!.nombreCompleto;
     await pedido.save();
 
     await registrarAuditoria({
       entidad: 'Pedido',
       accion: 'actualizar',
       detalle: `Se reprogramó el pedido ${pedido.numeroPedido}`,
-      usuario: String(pedido.usuarioActualizacion),
+      usuario: req.usuarioAutenticado!.nombreCompleto,
     });
     res.status(200).json({ mensaje: 'Pedido actualizado correctamente', pedido });
   } catch (error) {
@@ -288,7 +372,7 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
 
 export const cancelarPedido = async (req: Request, res: Response): Promise<void> => {
   try {
-    const pedidoActual = await Pedido.findOne({ _id: req.params.id, activo: true });
+    const pedidoActual = await Pedido.findOne({ _id: req.params.id, activo: { $ne: false } });
     if (!pedidoActual) {
       res.status(404).json({ mensaje: 'Pedido no encontrado o ya cancelado' });
       return;
@@ -299,8 +383,8 @@ export const cancelarPedido = async (req: Request, res: Response): Promise<void>
     }
 
     const pedido = await Pedido.findOneAndUpdate(
-      { _id: req.params.id, activo: true },
-      { $set: { estado: 'CANCELADO', activo: false, usuarioActualizacion: req.body?.usuarioActualizacion || 'Sistema' } },
+      { _id: req.params.id, activo: { $ne: false } },
+      { $set: { estado: 'CANCELADO', activo: false, usuarioActualizacion: req.usuarioAutenticado!.nombreCompleto } },
       { new: true }
     );
     if (!pedido) {
@@ -311,7 +395,7 @@ export const cancelarPedido = async (req: Request, res: Response): Promise<void>
       entidad: 'Pedido',
       accion: 'cancelar',
       detalle: `Se canceló lógicamente el pedido ${pedido.numeroPedido}`,
-      usuario: String(pedido.usuarioActualizacion),
+      usuario: req.usuarioAutenticado!.nombreCompleto,
     });
     res.status(200).json({ mensaje: 'Pedido cancelado correctamente', pedido });
   } catch (error) {

@@ -5,14 +5,14 @@ interface RegistroAuditoriaInput {
   entidad: string;
   accion: string;
   detalle: string;
-  usuario?: string;
+  usuario: string;
 }
 
 export const registrarAuditoria = async ({
   entidad,
   accion,
   detalle,
-  usuario = 'Sistema',
+  usuario,
 }: RegistroAuditoriaInput): Promise<void> => {
   await Auditoria.create({
     entidad,

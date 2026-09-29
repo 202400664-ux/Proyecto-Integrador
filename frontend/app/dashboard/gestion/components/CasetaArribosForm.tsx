@@ -1,17 +1,23 @@
 'use client';
 import React, { useState } from 'react';
 import { registrarArribo } from '../api';
-import { obtenerNombreUsuarioActual } from '../../auth';
 
 // 1. Declarar la prop en la interfaz
 interface CasetaArribosFormProps {
   onArriboRegistrado?: () => void;
 }
 
+interface ResultadoArribo {
+  estadoCalculado: string;
+  pedido: {
+    fechaHoraLlegadaReal: string;
+  };
+}
+
 // 2. Recibir la prop en el componente
 export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosFormProps) {
   const [numPedido, setNumPedido] = useState('');
-  const [resultado, setResultado] = useState<any>(null);
+  const [resultado, setResultado] = useState<ResultadoArribo | null>(null);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
@@ -22,7 +28,7 @@ export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosF
     setCargando(true);
 
     try {
-      const data = await registrarArribo(numPedido, obtenerNombreUsuarioActual());
+      const data = await registrarArribo(numPedido);
       setResultado(data);
       setNumPedido('');
 
@@ -30,8 +36,8 @@ export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosF
       if (onArriboRegistrado) {
         onArriboRegistrado();
       }
-    } catch (err: any) {
-      setError(err.message || 'Error al registrar el arribo');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al registrar el arribo');
     } finally {
       setCargando(false);
     }

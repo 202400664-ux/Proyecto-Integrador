@@ -1,10 +1,11 @@
-import { Schema, model, type Document } from 'mongoose';
+import { Schema, model, type Document, type Types } from 'mongoose';
 
 export type TipoMantenimiento = 'preventivo' | 'correctivo' | 'predictivo';
 export type EstadoMantenimiento = 'pendiente' | 'en_progreso' | 'completado' | 'cancelado';
 
 export interface IMantenimiento extends Document {
   numeroOrden: string;
+  proveedorId: Types.ObjectId;
   titulo: string;
   descripcion: string;
   tipo: TipoMantenimiento;
@@ -28,6 +29,11 @@ const mantenimientoSchema = new Schema<IMantenimiento>(
       required: true,
       unique: true,
       trim: true,
+    },
+    proveedorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Proveedor',
+      required: true,
     },
     titulo: {
       type: String,
