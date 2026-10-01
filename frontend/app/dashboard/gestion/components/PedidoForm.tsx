@@ -5,7 +5,6 @@ import { ApiError, actualizarPedido, crearPedido, type NuevoPedidoPayload } from
 import type { ConflictoPedido, Pedido, Proveedor, VentanaAlternativa } from '../types';
 
 interface FormState {
-  numeroPedido: string;
   proveedorId: string;
   tipoProducto: string;
   fechaHoraProgramada: string;
@@ -15,7 +14,6 @@ interface FormState {
 }
 
 const ESTADO_INICIAL: FormState = {
-  numeroPedido: '',
   proveedorId: '',
   tipoProducto: '',
   fechaHoraProgramada: '',
@@ -43,9 +41,10 @@ interface PedidoFormProps {
   pedidoEditar?: Pedido | null;
   onPedidoActualizado?: (pedido: Pedido) => void;
   onCancelarEdicion?: () => void;
+  limpiarMensaje?: number;
 }
 
-export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, onPedidoActualizado, onCancelarEdicion }: PedidoFormProps) {
+export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, onPedidoActualizado, onCancelarEdicion, limpiarMensaje = 0 }: PedidoFormProps) {
   const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
@@ -53,12 +52,19 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
+    if (limpiarMensaje > 0) {
+      setExito('');
+      setError('');
+      setConflicto(null);
+    }
+  }, [limpiarMensaje]);
+
+  useEffect(() => {
     if (!pedidoEditar) {
       setForm(ESTADO_INICIAL);
       return;
     }
     setForm({
-      numeroPedido: pedidoEditar.numeroPedido,
       proveedorId: typeof pedidoEditar.proveedorId === 'string' ? pedidoEditar.proveedorId : pedidoEditar.proveedorId._id,
       tipoProducto: pedidoEditar.tipoProducto,
       fechaHoraProgramada: aDatetimeLocal(new Date(pedidoEditar.inicioVentana)),
@@ -71,7 +77,22 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
   const handleChange = (campo: keyof FormState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setForm((prev) => ({ ...prev, [campo]: e.target.value }));
+    const valor = e.target.value;
+    setForm((prev) => {
+      const siguiente = { ...prev, [campo]: valor };
+      if (campo === 'inicioVentana' || campo === 'duracionEstimadaMinutos') {
+        const inicio = campo === 'inicioVentana' ? valor : prev.inicioVentana;
+        const duracion = Number(campo === 'duracionEstimadaMinutos' ? valor : prev.duracionEstimadaMinutos);
+        const inicioFecha = inicio ? new Date(inicio) : null;
+        if (inicioFecha && Number.isFinite(inicioFecha.getTime()) && Number.isFinite(duracion) && duracion > 0) {
+          inicioFecha.setMinutes(inicioFecha.getMinutes() + duracion);
+          siguiente.finVentana = aDatetimeLocal(inicioFecha);
+        } else {
+          siguiente.finVentana = '';
+        }
+      }
+      return siguiente;
+    });
   };
 
   const aplicarAlternativa = (alternativa: VentanaAlternativa) => {
@@ -94,7 +115,6 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
     // fechaHoraProgramada corresponde al inicio de la ventana: no tiene sentido pedirlo
     // aparte, así que se deriva automáticamente para no duplicar el dato en el formulario.
     const payload: NuevoPedidoPayload = {
-      numeroPedido: form.numeroPedido,
       proveedorId: form.proveedorId,
       tipoProducto: form.tipoProducto,
       fechaHoraProgramada: form.inicioVentana ? new Date(form.inicioVentana).toISOString() : '',
@@ -156,17 +176,6 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
 
       <div className="row g-3">
         <div className="col-md-6">
-          <label className="form-label">Número de pedido</label>
-          <input
-            type="text"
-            className="form-control"
-            value={form.numeroPedido}
-            onChange={handleChange('numeroPedido')}
-            required
-          />
-        </div>
-
-        <div className="col-md-6">
           <label className="form-label">Proveedor</label>
           <select
             className="form-select"
@@ -225,12 +234,13 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
         </div>
 
         <div className="col-md-6">
-          <label className="form-label">Fin de ventana</label>
+          <label className="form-label">Fin de ventana (calculado automáticamente)</label>
           <input
             type="datetime-local"
             className="form-control"
             value={form.finVentana}
             onChange={handleChange('finVentana')}
+            readOnly
             required
           />
         </div>
@@ -240,14 +250,16 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
         Horario operativo del centro: lunes a sábado, 7:00 a.m. – 5:00 p.m.
       </p>
 
-      <button type="submit" className="btn btn-primary mt-3 align-self-start px-4" disabled={enviando}>
-        {enviando ? 'Guardando...' : pedidoEditar ? 'Guardar cambios' : 'Programar pedido'}
-      </button>
-      {pedidoEditar && (
-        <button type="button" className="btn btn-link mt-3 ms-2" onClick={onCancelarEdicion}>
-          Cancelar edición
+      <div className="pedido-form-actions">
+        <button type="submit" className="btn btn-primary" disabled={enviando}>
+          {enviando ? 'Guardando...' : pedidoEditar ? 'Guardar cambios' : 'Programar pedido'}
         </button>
-      )}
+        {pedidoEditar && (
+          <button type="button" className="btn btn-primary" onClick={onCancelarEdicion}>
+            Cancelar edición
+          </button>
+        )}
+      </div>
     </form>
   );
 }

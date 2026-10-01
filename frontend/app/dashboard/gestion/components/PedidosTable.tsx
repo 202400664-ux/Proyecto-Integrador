@@ -30,7 +30,7 @@ function obtenerInfoEstado(p: Pedido): { texto: string; clase: string } {
 
   // Si ya tiene registrada fecha/hora de llegada real
   if (fechaLlegada) {
-    const estadoLlegada = String(p.estado || 'COMPLETADO');
+    const estadoLlegada = String(p.clasificacionPuntualidad || p.estado || 'COMPLETADO');
     switch (estadoLlegada) {
       case 'A TIEMPO':
       case 'COMPLETADO':

@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import { Pedido } from '../models/Pedido.js';
 import { Proveedor } from '../models/Proveedor.js';
+import { Gateway } from '../models/Gateway.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { marcarPedidosAusentes } from './llegadasController.js';
+import { ContadorPedido } from '../models/ContadorPedido.js';
 
 // --- Configuración del horario operativo del centro de distribución ---
 const HORARIO_OPERATIVO = {
@@ -31,6 +33,27 @@ const dentroDelHorarioOperativo = (inicio: Date, fin: Date): boolean => {
 // Revisa si dos ventanas de tiempo se traslapan
 const seTraslapan = (inicioA: Date, finA: Date, inicioB: Date, finB: Date): boolean =>
   inicioA < finB && inicioB < finA;
+
+const EQUIPO_CONFIGURADO = Number(process.env.EQUIPO_NUMERO);
+const EQUIPO_NUMERO = Number.isInteger(EQUIPO_CONFIGURADO) && EQUIPO_CONFIGURADO >= 1 && EQUIPO_CONFIGURADO <= 99
+  ? EQUIPO_CONFIGURADO
+  : 4;
+
+export async function generarNumeroPedido(): Promise<string> {
+  for (let intento = 0; intento < 100; intento += 1) {
+    const contador = await ContadorPedido.findOneAndUpdate(
+      { equipo: EQUIPO_NUMERO },
+      { $inc: { ultimo: 1 } },
+      { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
+    );
+    if (!contador || contador.ultimo > 999_999_999) {
+      throw new Error('Se agotó el rango disponible para el correlativo del equipo');
+    }
+    const numero = `PED-EQUI${String(EQUIPO_NUMERO).padStart(2, '0')}-${String(contador.ultimo).padStart(9, '0')}`;
+    if (!(await Pedido.exists({ numeroPedido: numero }))) return numero;
+  }
+  throw new Error('No se pudo generar un número de pedido único');
+}
 
 // Genera hasta 3 ventanas alternativas de la misma duración en días operativos.
 const generarAlternativas = async (
@@ -107,7 +130,6 @@ const generarAlternativas = async (
 export const crearPedido = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
-      numeroPedido,
       proveedorId,
       tipoProducto,
       fechaHoraProgramada,
@@ -118,7 +140,7 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
     } = req.body;
 
     // Validación de campos requeridos
-    if (!numeroPedido || !proveedorId || !tipoProducto || !fechaHoraProgramada || !inicioVentana || !finVentana || !duracionEstimadaMinutos) {
+    if (!proveedorId || !tipoProducto || !fechaHoraProgramada || !inicioVentana || !finVentana || !duracionEstimadaMinutos) {
       res.status(400).json({ mensaje: 'Faltan campos obligatorios' });
       return;
     }
@@ -134,7 +156,7 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
     }
 
     // --- RN-01: el proveedor debe existir ---
-    const proveedor = await Proveedor.findById(proveedorId);
+    const proveedor = await Proveedor.findOne({ _id: proveedorId, activo: true, estado: 'activo' });
     if (!proveedor) {
       res.status(404).json({ mensaje: 'El proveedor indicado no está registrado' });
       return;
@@ -168,9 +190,7 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
     }
 
    // --- RN-02b: sin solapamiento con otro pedido ya programado ---
-    const pedidosDelDia = await Pedido.find({
-      estado: { $ne: 'CANCELADO' },
-    });
+    const pedidosDelDia = await Pedido.find({ activo: true, estado: { $ne: 'CANCELADO' } });
 
     const pedidoEnConflicto = pedidosDelDia.find((pedido) =>
       seTraslapan(inicio, fin, new Date(pedido.inicioVentana), new Date(pedido.finVentana))
@@ -190,12 +210,7 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Verifica unicidad de numeroPedido con mensaje claro (además del índice único)
-    const yaExiste = await Pedido.findOne({ numeroPedido });
-    if (yaExiste) {
-      res.status(409).json({ mensaje: 'Ya existe un pedido con ese número' });
-      return;
-    }
+    const numeroPedido = await generarNumeroPedido();
 
     const nuevoPedido = await Pedido.create({
       numeroPedido,
@@ -250,8 +265,8 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
 
     const { proveedorId, tipoProducto, inicioVentana, finVentana, duracionEstimadaMinutos } = req.body;
     if (proveedorId !== undefined) {
-      const proveedor = await Proveedor.findById(proveedorId);
-      if (!proveedor || !proveedor.activo) {
+      const proveedor = await Proveedor.findOne({ _id: proveedorId, activo: true, estado: 'activo' });
+      if (!proveedor) {
         res.status(400).json({ mensaje: 'El proveedor indicado no existe o está inactivo' });
         return;
       }
@@ -268,6 +283,28 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
     }
     if (!dentroDelHorarioOperativo(pedido.inicioVentana, pedido.finVentana)) {
       res.status(400).json({ mensaje: 'La ventana debe estar entre 07:00 y 17:00, de lunes a sábado' });
+      return;
+    }
+    const duracionRealMinutos = (pedido.finVentana.getTime() - pedido.inicioVentana.getTime()) / 60000;
+    if (duracionRealMinutos !== Number(pedido.duracionEstimadaMinutos)) {
+      res.status(400).json({ mensaje: 'La duración estimada debe coincidir con la duración de la ventana' });
+      return;
+    }
+    const pedidosActivos = await Pedido.find({
+      _id: { $ne: pedido._id },
+      activo: true,
+      estado: { $ne: 'CANCELADO' },
+    });
+    const conflicto = pedidosActivos.find((existente) =>
+      seTraslapan(pedido.inicioVentana, pedido.finVentana, existente.inicioVentana, existente.finVentana)
+    );
+    if (conflicto) {
+      const alternativas = await generarAlternativas(pedido.inicioVentana, Number(pedido.duracionEstimadaMinutos), String(pedido._id));
+      res.status(409).json({
+        mensaje: 'La ventana solicitada se traslapa con otro pedido ya programado',
+        conflictoCon: { numeroPedido: conflicto.numeroPedido, inicioVentana: conflicto.inicioVentana, finVentana: conflicto.finVentana },
+        ventanasAlternativas: alternativas,
+      });
       return;
     }
     pedido.fechaHoraProgramada = pedido.inicioVentana;
@@ -296,6 +333,17 @@ export const cancelarPedido = async (req: Request, res: Response): Promise<void>
     if (pedidoActual.fechaHoraLlegadaReal) {
       res.status(409).json({ mensaje: 'El pedido ya fue entregado y no se puede cancelar' });
       return;
+    }
+    if (pedidoActual.estado === 'DESCARGANDO') {
+      res.status(409).json({ mensaje: 'No se puede cancelar mientras la descarga está activa' });
+      return;
+    }
+
+    if (pedidoActual.gatewayId) {
+      await Gateway.updateOne(
+        { _id: pedidoActual.gatewayId, estado: 'LIBRE', pedidoAsignadoId: pedidoActual._id },
+        { $unset: { pedidoAsignadoId: 1 } }
+      );
     }
 
     const pedido = await Pedido.findOneAndUpdate(

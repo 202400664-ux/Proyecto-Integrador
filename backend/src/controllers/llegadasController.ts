@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Pedido } from '../models/Pedido.js';
 import { Parametro } from '../models/Parametro.js';
 import { registrarAuditoria } from './auditoriaController.js';
+import { encolarPedido } from '../services/colaPrioridad.js';
 
 /** Lee un parámetro numérico de tolerancia; si no existe, usa el valor por defecto. */
 async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Promise<number> {
@@ -13,7 +14,8 @@ async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Prom
 
 export const registrarLlegada = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { numeroPedido, usuarioNombre } = req.body;
+    const { numeroPedido } = req.body;
+    const usuarioNombre = req.usuario?.nombreCompleto || req.body.usuarioNombre || 'Operador Caseta';
 
     const pedido = await Pedido.findOne({ numeroPedido, activo: true });
     if (!pedido) {
@@ -48,6 +50,7 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
     }
 
     pedido.estado = nuevoEstado;
+    pedido.clasificacionPuntualidad = nuevoEstado;
     pedido.usuarioActualizacion = usuarioNombre || 'Operador Caseta';
     await pedido.save();
 
@@ -58,10 +61,17 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
       usuario: usuarioNombre || 'Operador Caseta',
     });
 
+    try {
+      await encolarPedido(String(pedido._id));
+    } catch (error) {
+      console.error('No se pudo procesar el pedido en la cola de gateways:', error);
+    }
+    const pedidoActualizado = await Pedido.findById(pedido._id).populate('gatewayId');
+
     res.status(200).json({
       mensaje: 'Arribo registrado con éxito',
       estadoCalculado: nuevoEstado,
-      pedido,
+      pedido: pedidoActualizado,
     });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al registrar el arribo', error });

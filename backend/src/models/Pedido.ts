@@ -1,7 +1,7 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
 
 export type TipoProducto = 'construcción' | 'general';
-export type EstadoPedido = 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'CANCELADO';
+export type EstadoPedido = 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'EN_COLA' | 'GATEWAY_ASIGNADO' | 'DESCARGANDO' | 'FINALIZADO' | 'CANCELADO';
 
 export interface IPedido extends Document {
   numeroPedido: string;
@@ -13,6 +13,9 @@ export interface IPedido extends Document {
   duracionEstimadaMinutos: number;
   fechaHoraLlegadaReal?: Date;
   estado: EstadoPedido;
+  clasificacionPuntualidad?: 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO';
+  gatewayId?: Types.ObjectId;
+  fechaEntradaCola?: Date;
   activo: boolean;
   usuarioCreacion: string;
   usuarioActualizacion: string;
@@ -58,10 +61,21 @@ const pedidoSchema = new Schema<IPedido>(
     fechaHoraLlegadaReal: {
       type: Date,
     },
+    gatewayId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Gateway',
+    },
+    fechaEntradaCola: {
+      type: Date,
+    },
     estado: {
       type: String,
-      enum: ['PROGRAMADO', 'ANTICIPADO', 'A TIEMPO', 'TARDÍO', 'AUSENTE', 'CANCELADO'] satisfies EstadoPedido[],
+      enum: ['PROGRAMADO', 'ANTICIPADO', 'A TIEMPO', 'TARDÍO', 'AUSENTE', 'EN_COLA', 'GATEWAY_ASIGNADO', 'DESCARGANDO', 'FINALIZADO', 'CANCELADO'] satisfies EstadoPedido[],
       default: 'PROGRAMADO',
+    },
+    clasificacionPuntualidad: {
+      type: String,
+      enum: ['ANTICIPADO', 'A TIEMPO', 'TARDÍO'],
     },
     activo: {
       type: Boolean,

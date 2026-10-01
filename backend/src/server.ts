@@ -9,6 +9,12 @@ import llegadasRoutes from './routes/llegadas.js';
 import mantenimientosRoutes from './routes/mantenimientos.js';
 import auditoriaRoutes from './routes/auditoria.js';
 import parametrosRoutes from './routes/parametros.js';
+import gatewaysRoutes from './routes/gateways.js';
+import colaRoutes from './routes/cola.js';
+import descargasRoutes from './routes/descargas.js';
+import { inicializarGateways } from './controllers/gatewayController.js';
+import { autenticar, requiereRol } from './middleware/autenticacion.js';
+import notificacionesRoutes from './routes/notificaciones.js';
 
 dotenv.config();
 
@@ -22,17 +28,24 @@ app.use(express.json());
 // 1. Conectar a MongoDB
 mongoose
   .connect(MONGO_URI)
-  .then(() => console.log('✅ Conectado a MongoDB correctamente'))
+  .then(async () => {
+    await inicializarGateways();
+    console.log('✅ Conectado a MongoDB correctamente');
+  })
   .catch((err) => console.error('❌ Error al conectar con MongoDB:', err));
 
 // 2. Registrar las rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/proveedores', proveedoresRoutes);
 app.use('/api/pedidos', pedidosRoutes);
-app.use('/api/llegadas', llegadasRoutes);
+app.use('/api/llegadas', autenticar, requiereRol('administrador', 'coordinador', 'operador'), llegadasRoutes);
 app.use('/api/mantenimientos', mantenimientosRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/parametros', parametrosRoutes);
+app.use('/api/gateways', gatewaysRoutes);
+app.use('/api/cola', colaRoutes);
+app.use('/api/descargas', descargasRoutes);
+app.use('/api/notificaciones', notificacionesRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor backend corriendo en el puerto ${PORT}`);

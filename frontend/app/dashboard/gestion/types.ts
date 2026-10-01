@@ -27,8 +27,31 @@ export interface Pedido {
   inicioVentana: string;
   finVentana: string;
   duracionEstimadaMinutos: number;
-  estado: 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'CANCELADO';
+  estado: 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'EN_COLA' | 'GATEWAY_ASIGNADO' | 'DESCARGANDO' | 'FINALIZADO' | 'CANCELADO';
+  clasificacionPuntualidad?: 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO';
   fechaHoraLlegadaReal?: string;
+  gatewayId?: string | GatewayRef;
+  fechaEntradaCola?: string;
+}
+
+export interface GatewayRef {
+  _id: string;
+  numeroGateway: number;
+  tipoCargaPermitida: Categoria;
+  estado: 'LIBRE' | 'OCUPADO' | 'FUERA DE SERVICIO';
+}
+
+export interface Gateway extends GatewayRef {
+  activo: boolean;
+  pedidoAsignadoId?: string;
+  pedidoAsignado?: { _id: string; numeroPedido: string; tipoProducto: Categoria; estado: Pedido['estado'] } | null;
+}
+
+export interface DescargaActiva {
+  _id: string;
+  gatewayId: GatewayRef;
+  pedidoId: Pedido;
+  fechaHoraInicio: string;
 }
 
 export interface VentanaAlternativa {
@@ -44,4 +67,13 @@ export interface ConflictoPedido {
     finVentana: string;
   };
   ventanasAlternativas: VentanaAlternativa[];
+}
+
+export interface Notificacion {
+  _id: string;
+  titulo: string;
+  mensaje: string;
+  entidad: string;
+  leida: boolean;
+  fechaCreacion: string;
 }

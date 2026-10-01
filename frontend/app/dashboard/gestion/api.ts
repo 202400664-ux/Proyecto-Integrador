@@ -1,4 +1,4 @@
-import type { Pedido, Proveedor } from './types';
+import type { DescargaActiva, Gateway, Notificacion, Pedido, Proveedor } from './types';
 import { obtenerNombreUsuarioActual } from '../auth';
 
 export const API_BASE_URL = 'http://localhost:4000/api';
@@ -13,7 +13,6 @@ export interface NuevoProveedorPayload {
 }
 
 export interface NuevoPedidoPayload {
-  numeroPedido: string;
   proveedorId: string;
   tipoProducto: string;
   fechaHoraProgramada: string;
@@ -130,4 +129,70 @@ export async function registrarArribo(numeroPedido: string, usuarioNombre: strin
   }
 
   return data;
+}
+
+function headersConSesion(): HeadersInit {
+  const token = localStorage.getItem('token');
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+export async function obtenerGateways(): Promise<Gateway[]> {
+  const response = await fetch(`${API_BASE_URL}/gateways`, { headers: headersConSesion() });
+  const data = await parseOrThrow<{ gateways: Gateway[] }>(response);
+  return data.gateways;
+}
+
+export async function obtenerColaPrioridad(): Promise<Pedido[]> {
+  const response = await fetch(`${API_BASE_URL}/cola`, { headers: headersConSesion() });
+  const data = await parseOrThrow<{ pedidos: Pedido[] }>(response);
+  return data.pedidos;
+}
+
+export async function obtenerDescargasActivas(): Promise<DescargaActiva[]> {
+  const response = await fetch(`${API_BASE_URL}/descargas/activas`, { headers: headersConSesion() });
+  const data = await parseOrThrow<{ descargas: DescargaActiva[] }>(response);
+  return data.descargas;
+}
+
+export async function cambiarEstadoGateway(id: string, estado: 'LIBRE' | 'FUERA DE SERVICIO'): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/gateways/${id}`, {
+    method: 'PUT', headers: headersConSesion(), body: JSON.stringify({ estado, usuarioActualizacion: obtenerNombreUsuarioActual() }),
+  });
+  await parseOrThrow(response);
+}
+
+export async function iniciarDescarga(pedidoId: string, gatewayId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/descargas/iniciar`, {
+    method: 'POST', headers: headersConSesion(), body: JSON.stringify({ pedidoId, gatewayId }),
+  });
+  await parseOrThrow(response);
+}
+
+export async function finalizarDescarga(descargaId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/descargas/finalizar`, {
+    method: 'POST', headers: headersConSesion(), body: JSON.stringify({ descargaId }),
+  });
+  await parseOrThrow(response);
+}
+
+export async function obtenerGatewaysInactivos(): Promise<Gateway[]> {
+  const response = await fetch(`${API_BASE_URL}/gateways/inactivos`, { headers: headersConSesion() });
+  const data = await parseOrThrow<{ gateways: Gateway[] }>(response);
+  return data.gateways;
+}
+
+export async function inactivarGateway(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/gateways/${id}`, { method: 'DELETE', headers: headersConSesion() });
+  await parseOrThrow(response);
+}
+
+export async function reactivarGateway(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/gateways/${id}/reactivar`, { method: 'PATCH', headers: headersConSesion() });
+  await parseOrThrow(response);
+}
+
+export async function obtenerNotificaciones(): Promise<Notificacion[]> {
+  const response = await fetch(`${API_BASE_URL}/notificaciones`, { headers: headersConSesion() });
+  const data = await parseOrThrow<{ notificaciones: Notificacion[] }>(response);
+  return data.notificaciones;
 }

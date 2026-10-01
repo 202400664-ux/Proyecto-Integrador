@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { ClientSession } from 'mongoose';
 import { Auditoria } from '../models/Auditoria.js';
 
 interface RegistroAuditoriaInput {
@@ -6,6 +7,7 @@ interface RegistroAuditoriaInput {
   accion: string;
   detalle: string;
   usuario?: string;
+  session?: ClientSession;
 }
 
 export const registrarAuditoria = async ({
@@ -13,14 +15,16 @@ export const registrarAuditoria = async ({
   accion,
   detalle,
   usuario = 'Sistema',
+  session,
 }: RegistroAuditoriaInput): Promise<void> => {
-  await Auditoria.create({
+  const registro = new Auditoria({
     entidad,
     accion,
     detalle,
     usuario,
     fecha: new Date(),
   });
+  await registro.save(session ? { session } : undefined);
 };
 
 export const obtenerAuditorias = async (_req: Request, res: Response): Promise<void> => {

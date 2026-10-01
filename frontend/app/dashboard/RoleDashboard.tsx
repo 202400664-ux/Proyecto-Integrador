@@ -11,6 +11,7 @@ const MENU_ITEMS = [
   { key: 'proveedores', label: 'Proveedores', icon: '▣' },
   { key: 'pedidos', label: 'Pedidos', icon: '▤' },
   { key: 'caseta', label: 'Caseta', icon: '◫' },
+  { key: 'gateways', label: 'Gateways', icon: '▥' },
   { key: 'mantenimientos', label: 'Mantenimientos', icon: '◧' },
   { key: 'auditoria', label: 'Auditoría', icon: '◌' },
 ] as const;
@@ -77,7 +78,7 @@ interface RoleDashboardProps {
 export default function RoleDashboard({ children }: RoleDashboardProps) {
   const rol = useSyncExternalStore(subscribeToSession, readRoleFromToken, () => null);
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -115,6 +116,8 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
                 type="button"
                 className="dashboard-menu-button"
                 aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+                aria-expanded={sidebarOpen}
+                aria-controls="dashboard-sidebar"
                 onClick={() => setSidebarOpen((prev) => !prev)}
               >
                 <span />
@@ -141,17 +144,8 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
           </div>
         </header>
 
-        <main className="dashboard-main dashboard-layout">
-          {sidebarOpen && (
-            <button
-              type="button"
-              className="dashboard-menu-backdrop"
-              aria-label="Cerrar menú"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-
-          <aside className={`dashboard-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <main className={`dashboard-main dashboard-layout ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>
+          <aside id="dashboard-sidebar" className={`dashboard-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
             <div className="dashboard-sidebar-header">
               <div className="dashboard-sidebar-brand">LOGÍSTICA</div>
             </div>
@@ -168,7 +162,6 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
                     } else {
                       window.dispatchEvent(new CustomEvent('dashboard:select-tab', { detail: item.key }));
                     }
-                    setSidebarOpen(false);
                   }}
                 >
                   <span className="dashboard-nav-icon">{item.icon}</span>

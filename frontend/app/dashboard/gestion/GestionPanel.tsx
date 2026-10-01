@@ -12,8 +12,9 @@ import CasetaArribosForm from './components/CasetaArribosForm';
 import MantenimientosPanel from './components/MantenimientosPanel';
 import AuditoriaPanel from './components/AuditoriaPanel';
 import ParametrosPanel from './components/ParametrosPanel';
+import GatewaysPanel from './components/GatewaysPanel';
 
-type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'mantenimientos' | 'auditoria' | 'parametros';
+type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'gateways' | 'mantenimientos' | 'auditoria' | 'parametros';
 
 /**
  * Panel único de Proveedores/Pedidos/Caseta para TODOS los roles.
@@ -24,8 +25,8 @@ type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'mantenimientos
  * controlado centralmente en `permisos.ts` a través de `useRol().puede(...)`.
  */
 export default function GestionPanel() {
-  const { puede } = useRol();
-  const [pestana, setPestana] = useState<Pestana>('inicio');
+  const { puede, rol } = useRol();
+  const [pestana, setPestana] = useState<Pestana>(() => rol === 'coordinador' ? 'gateways' : 'inicio');
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [cargandoProveedores, setCargandoProveedores] = useState(true);
@@ -36,6 +37,8 @@ export default function GestionPanel() {
   const [errorCarga, setErrorCarga] = useState('');
   const [proveedorEditar, setProveedorEditar] = useState<Proveedor | null>(null);
   const [pedidoEditar, setPedidoEditar] = useState<Pedido | null>(null);
+  const [mensajePedido, setMensajePedido] = useState('');
+  const [limpiarMensajePedido, setLimpiarMensajePedido] = useState(0);
 
   useEffect(() => {
     let activo = true;
@@ -71,7 +74,7 @@ export default function GestionPanel() {
     const onShowHome = () => setPestana('inicio');
     const onSelectTab = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
-      if (detail && ['inicio', 'proveedores', 'pedidos', 'caseta', 'parametros', 'mantenimientos', 'auditoria'].includes(detail)) {
+      if (detail && ['inicio', 'proveedores', 'pedidos', 'caseta', 'gateways', 'parametros', 'mantenimientos', 'auditoria'].includes(detail)) {
         setPestana(detail as Pestana);
       }
     };
@@ -163,21 +166,25 @@ export default function GestionPanel() {
 
       {pestana === 'pedidos' && (
         <>
+          {mensajePedido && <div className="alert alert-success" role="status">{mensajePedido}</div>}
           {puede('pedidos.crear') && (
             <PedidoForm
               proveedores={proveedores}
               pedidoEditar={pedidoEditar}
+              limpiarMensaje={limpiarMensajePedido}
               onCancelarEdicion={() => setPedidoEditar(null)}
               onPedidoActualizado={(actualizado) => {
                 setPedidos((prev) => prev.map((item) => item._id === actualizado._id ? actualizado : item));
                 setPedidoEditar(null);
+                setMensajePedido('');
               }}
               onPedidoCreado={(nuevo) =>
-                setPedidos((prev) =>
-                  [...prev, nuevo].sort(
+                {
+                  setMensajePedido('');
+                  setPedidos((prev) => [...prev, nuevo].sort(
                     (a, b) => new Date(a.inicioVentana).getTime() - new Date(b.inicioVentana).getTime()
-                  )
-                )
+                  ));
+                }
               }
             />
           )}
@@ -189,8 +196,15 @@ export default function GestionPanel() {
             onCancelar={async (id) => {
               if (!window.confirm('¿Cancelar este pedido? Se conservará en la base de datos, pero dejará de aparecer en el tablero.')) return;
               try {
+                const pedidoCancelado = pedidos.find((item) => item._id === id);
                 await cancelarPedido(id);
                 setPedidos(await obtenerPedidos());
+                setMensajePedido(
+                  `Pedido "${pedidoCancelado?.numeroPedido || ''}" eliminado de la lista. El registro se conservó en la base de datos.`
+                );
+                setLimpiarMensajePedido((prev) => prev + 1);
+                setPedidoEditar(null);
+                setErrorCarga('');
               } catch (error) {
                 setErrorCarga(error instanceof Error ? error.message : 'No se pudo cancelar el pedido');
               }
@@ -210,6 +224,13 @@ export default function GestionPanel() {
               console.error('Error al actualizar pedidos tras arribo:', err);
             }
           }}
+        />
+      )}
+
+      {pestana === 'gateways' && puede('gateways.ver') && (
+        <GatewaysPanel
+          puedeAdministrar={puede('gateways.admin')}
+          puedeOperar={puede('descargas.operar')}
         />
       )}
 
