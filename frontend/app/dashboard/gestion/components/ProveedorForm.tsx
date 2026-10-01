@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { ApiError, actualizarProveedor, crearProveedor, type NuevoProveedorPayload } from '../api';
 import type { Proveedor } from '../types';
 import { formatearTelefono, soloLetras, soloNumeros } from '../validacion';
@@ -14,8 +14,21 @@ const ESTADO_INICIAL: NuevoProveedorPayload = {
   emailContacto: '',
 };
 
+function estadoDesdeProveedor(proveedor?: Proveedor | null): NuevoProveedorPayload {
+  if (!proveedor) return ESTADO_INICIAL;
+  return {
+    razonSocial: proveedor.razonSocial,
+    identificacionTributaria: proveedor.identificacionTributaria,
+    categoria: proveedor.categoria,
+    contactoNombre: proveedor.contactoNombre,
+    telefono: proveedor.telefono,
+    emailContacto: proveedor.emailContacto,
+  };
+}
+
 interface ProveedorFormProps {
   onProveedorCreado: (proveedor: Proveedor) => void;
+  onResultado?: (mensaje: string) => void;
   proveedorEditar?: Proveedor | null;
   onProveedorActualizado?: (proveedor: Proveedor) => void;
   onCancelarEdicion?: () => void;
@@ -23,29 +36,14 @@ interface ProveedorFormProps {
 
 export default function ProveedorForm({
   onProveedorCreado,
+  onResultado,
   proveedorEditar,
   onProveedorActualizado,
   onCancelarEdicion,
 }: ProveedorFormProps) {
-  const [form, setForm] = useState<NuevoProveedorPayload>(ESTADO_INICIAL);
+  const [form, setForm] = useState<NuevoProveedorPayload>(() => estadoDesdeProveedor(proveedorEditar));
   const [error, setError] = useState('');
-  const [exito, setExito] = useState('');
   const [enviando, setEnviando] = useState(false);
-
-  useEffect(() => {
-    if (!proveedorEditar) {
-      setForm(ESTADO_INICIAL);
-      return;
-    }
-    setForm({
-      razonSocial: proveedorEditar.razonSocial,
-      identificacionTributaria: proveedorEditar.identificacionTributaria,
-      categoria: proveedorEditar.categoria,
-      contactoNombre: proveedorEditar.contactoNombre,
-      telefono: proveedorEditar.telefono,
-      emailContacto: proveedorEditar.emailContacto,
-    });
-  }, [proveedorEditar]);
 
   // Cada campo se sanea mientras el usuario escribe: no se permite teclear
   // caracteres inválidos en vez de solo rechazarlos hasta enviar el formulario.
@@ -78,14 +76,14 @@ export default function ProveedorForm({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    setExito('');
+    onResultado?.('');
     setEnviando(true);
 
     try {
       const proveedor = proveedorEditar
         ? await actualizarProveedor(proveedorEditar._id, form)
         : await crearProveedor(form);
-      setExito(`Proveedor "${proveedor.razonSocial}" ${proveedorEditar ? 'actualizado' : 'registrado'} correctamente.`);
+      onResultado?.(`Proveedor "${proveedor.razonSocial}" ${proveedorEditar ? 'actualizado' : 'registrado'} correctamente.`);
       setForm(ESTADO_INICIAL);
       if (proveedorEditar) onProveedorActualizado?.(proveedor);
       else onProveedorCreado(proveedor);
@@ -103,7 +101,6 @@ export default function ProveedorForm({
       </h2>
 
       {error && <div className="alert alert-danger py-2">{error}</div>}
-      {exito && <div className="alert alert-success py-2">{exito}</div>}
 
       <div className="row g-3">
         <div className="col-md-6">

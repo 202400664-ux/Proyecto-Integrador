@@ -1,62 +1,66 @@
 'use client';
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+
+import type { Rol } from '../../permisos';
+
+export type PestanaDashboard =
+  | 'inicio'
+  | 'proveedores'
+  | 'pedidos'
+  | 'caseta'
+  | 'mantenimientos'
+  | 'auditoria'
+  | 'parametros';
 
 interface SidebarProps {
-  rol: string;
+  rol: Rol;
+  abierto: boolean;
+  pestanaActiva: PestanaDashboard;
+  onNavegar: (pestana: PestanaDashboard) => void;
+  onCerrar: () => void;
 }
 
-export default function Sidebar({ rol }: SidebarProps) {
-  const [colapsado, setColapsado] = useState(false);
-  const router = useRouter();
+const MENU_ITEMS: Array<{ key: PestanaDashboard; label: string; icon: string }> = [
+  { key: 'inicio', label: 'Inicio', icon: '⌂' },
+  { key: 'proveedores', label: 'Proveedores', icon: '▣' },
+  { key: 'pedidos', label: 'Pedidos', icon: '▤' },
+  { key: 'caseta', label: 'Caseta', icon: '◫' },
+  { key: 'auditoria', label: 'Auditoría', icon: '◌' },
+];
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/');
-  };
+export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerrar }: SidebarProps) {
+  const items = [
+    ...MENU_ITEMS.filter((item) => item.key !== 'auditoria' || rol !== 'operador'),
+    ...(rol === 'administrador' ? [{ key: 'parametros' as const, label: 'Parámetros', icon: '⚙' }] : []),
+  ];
 
   return (
     <aside
-      className={`bg-dark text-white p-3 vh-100 d-flex flex-column transition-all`}
-      style={{ width: colapsado ? '80px' : '250px', transition: '0.3s' }}
+      id="dashboard-sidebar"
+      className={`dashboard-sidebar ${abierto ? 'open' : 'closed'}`}
+      aria-label="Navegación principal"
+      aria-hidden={!abierto}
     >
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        {!colapsado && <h5 className="m-0 text-warning">LOGÍSTICA</h5>}
-        <button
-          className="btn btn-sm btn-outline-light"
-          onClick={() => setColapsado(!colapsado)}
-        >
-          {colapsado ? '☰' : '◀'}
-        </button>
+      <div className="dashboard-sidebar-header">
+        <div className="dashboard-sidebar-brand">LOGÍSTICA</div>
       </div>
-
-      <nav className="nav nav-pills flex-column mb-auto">
-        <span className="text-muted small px-2 mb-2">
-          {!colapsado && `ROL: ${rol.toUpperCase()}`}
-        </span>
-
-        {rol === 'operador' && (
-          <Link href="/dashboard/operador/caseta" className="nav-link text-white my-1">
-            📱 Caseta Arribos
-          </Link>
-        )}
-
-        {(rol === 'coordinador' || rol === 'administrador') && (
-          <>
-            <Link href="/dashboard/coordinador/pedidos" className="nav-link text-white my-1">
-              📦 Pedidos
-            </Link>
-            <Link href="/dashboard/coordinador/proveedores" className="nav-link text-white my-1">
-              🚚 Proveedores
-            </Link>
-          </>
-        )}
+      <nav className="dashboard-sidebar-nav">
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`dashboard-nav-item ${pestanaActiva === item.key ? 'active' : ''}`}
+            aria-current={pestanaActiva === item.key ? 'page' : undefined}
+            tabIndex={abierto ? 0 : -1}
+            onClick={() => {
+              onNavegar(item.key);
+              onCerrar();
+            }}
+          >
+            <span className="dashboard-nav-icon" aria-hidden="true">{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
       </nav>
-
-      <button className="btn btn-danger w-100 mt-auto" onClick={handleLogout}>
-        {colapsado ? '🚪' : 'Cerrar Sesión'}
-      </button>
     </aside>
   );
 }

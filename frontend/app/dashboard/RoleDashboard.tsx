@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
 import { esRolValido, type Rol } from './permisos';
 import { RolProvider } from './RolContext';
+<<<<<<< HEAD
 
 const MENU_ITEMS = [
   { key: 'inicio', label: 'Inicio', icon: '⌂' },
@@ -17,6 +18,9 @@ const MENU_ITEMS = [
 ] as const;
 
 const PARAMETROS_MENU_ITEM = { key: 'parametros', label: 'Parámetros', icon: '⚙' } as const;
+=======
+import Sidebar, { type PestanaDashboard } from './gestion/components/Sidebar';
+>>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 
 interface DecodedToken {
   rol: Rol;
@@ -78,7 +82,12 @@ interface RoleDashboardProps {
 export default function RoleDashboard({ children }: RoleDashboardProps) {
   const rol = useSyncExternalStore(subscribeToSession, readRoleFromToken, () => null);
   const router = useRouter();
+<<<<<<< HEAD
   const [sidebarOpen, setSidebarOpen] = useState(true);
+=======
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pestanaActiva, setPestanaActiva] = useState<PestanaDashboard>('inicio');
+>>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -97,11 +106,34 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
     return () => window.removeEventListener('popstate', onPopState);
   }, [router]);
 
+  useEffect(() => {
+    const onShowHome = () => setPestanaActiva('inicio');
+    const onSelectTab = (event: Event) => {
+      const pestana = (event as CustomEvent<PestanaDashboard>).detail;
+      if (pestana) setPestanaActiva(pestana);
+    };
+
+    window.addEventListener('dashboard:show-home', onShowHome);
+    window.addEventListener('dashboard:select-tab', onSelectTab as EventListener);
+    return () => {
+      window.removeEventListener('dashboard:show-home', onShowHome);
+      window.removeEventListener('dashboard:select-tab', onSelectTab as EventListener);
+    };
+  }, []);
+
   const handleLogout = () => {
     removeStoredSession();
     window.dispatchEvent(new Event('sessionchange'));
     window.history.replaceState(null, '', '/');
     router.replace('/');
+  };
+
+  const navegar = (pestana: PestanaDashboard) => {
+    if (pestana === 'inicio') {
+      window.dispatchEvent(new Event('dashboard:show-home'));
+    } else {
+      window.dispatchEvent(new CustomEvent('dashboard:select-tab', { detail: pestana }));
+    }
   };
 
   if (!rol) return null;
@@ -144,6 +176,7 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
           </div>
         </header>
 
+<<<<<<< HEAD
         <main className={`dashboard-main dashboard-layout ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>
           <aside id="dashboard-sidebar" className={`dashboard-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
             <div className="dashboard-sidebar-header">
@@ -170,6 +203,25 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
               ))}
             </nav>
           </aside>
+=======
+        <main className="dashboard-main dashboard-layout">
+          {sidebarOpen && (
+            <button
+              type="button"
+              className="dashboard-menu-backdrop"
+              aria-label="Cerrar menú"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          <Sidebar
+            rol={rol}
+            abierto={sidebarOpen}
+            pestanaActiva={pestanaActiva}
+            onNavegar={navegar}
+            onCerrar={() => setSidebarOpen(false)}
+          />
+>>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 
           <div className="dashboard-panel">{children}</div>
         </main>

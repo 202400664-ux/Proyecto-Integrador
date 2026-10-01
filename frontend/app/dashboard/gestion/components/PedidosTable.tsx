@@ -4,11 +4,14 @@ interface PedidosTableProps {
   pedidos: Pedido[];
   proveedores: ProveedorRef[];
   cargando: boolean;
+  puedeEditar: boolean;
+  puedeCancelar: boolean;
   onEditar: (pedido: Pedido) => void;
   onCancelar: (id: string) => void;
 }
 
 function nombreProveedor(proveedorId: Pedido['proveedorId'], proveedores: ProveedorRef[]): string {
+  if (!proveedorId) return 'Proveedor no disponible';
   if (typeof proveedorId === 'string') {
     return proveedores.find((proveedor) => proveedor._id === proveedorId)?.razonSocial ?? proveedorId;
   }
@@ -63,7 +66,7 @@ function obtenerInfoEstado(p: Pedido): { texto: string; clase: string } {
   return { texto: 'PROGRAMADO', clase: 'bg-primary' };
 }
 
-export default function PedidosTable({ pedidos, proveedores, cargando, onEditar, onCancelar }: PedidosTableProps) {
+export default function PedidosTable({ pedidos, proveedores, cargando, puedeEditar, puedeCancelar, onEditar, onCancelar }: PedidosTableProps) {
   return (
     <div className="card p-4 shadow-sm border-0">
       <h2 className="h5 fw-bold mb-3" style={{ color: '#123149' }}>
@@ -85,7 +88,7 @@ export default function PedidosTable({ pedidos, proveedores, cargando, onEditar,
                 <th>Ventana</th>
                 <th>Duración</th>
                 <th>Estado</th>
-                <th>Acciones</th>
+                {(puedeEditar || puedeCancelar) && <th>Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -106,20 +109,18 @@ export default function PedidosTable({ pedidos, proveedores, cargando, onEditar,
                         {infoEstado.texto}
                       </span>
                     </td>
-                    <td className="text-nowrap">
-                      {yaEntregado ? (
-                        <small className="text-secondary fw-semibold">Ya entregado</small>
-                      ) : (
-                        <>
-                          <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => onEditar(p)}>
-                            Editar
-                          </button>
-                          <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onCancelar(p._id)}>
-                            Cancelar
-                          </button>
-                        </>
-                      )}
-                    </td>
+                    {(puedeEditar || puedeCancelar) && (
+                      <td className="text-nowrap">
+                        {yaEntregado ? (
+                          <small className="text-secondary fw-semibold">Ya entregado</small>
+                        ) : (
+                          <>
+                            {puedeEditar && <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => onEditar(p)}>Editar</button>}
+                            {puedeCancelar && <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onCancelar(p._id)}>Cancelar</button>}
+                          </>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}

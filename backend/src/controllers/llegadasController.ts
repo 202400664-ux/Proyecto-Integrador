@@ -15,9 +15,12 @@ async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Prom
 export const registrarLlegada = async (req: Request, res: Response): Promise<void> => {
   try {
     const { numeroPedido } = req.body;
+<<<<<<< HEAD
     const usuarioNombre = req.usuario?.nombreCompleto || req.body.usuarioNombre || 'Operador Caseta';
+=======
+>>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 
-    const pedido = await Pedido.findOne({ numeroPedido, activo: true });
+    const pedido = await Pedido.findOne({ numeroPedido, activo: { $ne: false }, estado: { $ne: 'CANCELADO' } });
     if (!pedido) {
       res.status(404).json({ mensaje: 'Pedido no encontrado o inactivo.' });
       return;
@@ -50,15 +53,20 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
     }
 
     pedido.estado = nuevoEstado;
+<<<<<<< HEAD
     pedido.clasificacionPuntualidad = nuevoEstado;
     pedido.usuarioActualizacion = usuarioNombre || 'Operador Caseta';
+=======
+    const actor = req.usuarioAutenticado!.nombreCompleto;
+    pedido.usuarioActualizacion = actor;
+>>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
     await pedido.save();
 
     await registrarAuditoria({
       entidad: 'Llegada',
       accion: 'registrar',
-      detalle: `Pedido ${pedido.numeroPedido} clasificado como ${nuevoEstado}. Ventana: ${new Date(pedido.inicioVentana).toISOString()} - ${new Date(pedido.finVentana).toISOString()}. Llegada real: ${fechaLlegadaReal.toISOString()}. Usuario: ${usuarioNombre || 'Operador Caseta'}`,
-      usuario: usuarioNombre || 'Operador Caseta',
+      detalle: `Pedido ${pedido.numeroPedido} clasificado como ${nuevoEstado}. Ventana: ${new Date(pedido.inicioVentana).toISOString()} - ${new Date(pedido.finVentana).toISOString()}. Llegada real: ${fechaLlegadaReal.toISOString()}. Usuario: ${actor}`,
+      usuario: actor,
     });
 
     try {
@@ -90,7 +98,7 @@ export async function marcarPedidosAusentes(): Promise<void> {
 
   await Pedido.updateMany(
     {
-      activo: true,
+      activo: { $ne: false },
       estado: 'PROGRAMADO',
       $or: [
         { fechaHoraLlegadaReal: { $exists: false } },

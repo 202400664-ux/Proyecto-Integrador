@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { Usuario } from './models/Usuario.js';
 import { Role, type RoleName } from './models/Role.js';
+import { Parametro } from './models/Parametro.js';
 
 dotenv.config();
 
@@ -12,18 +13,29 @@ const crearUsuarioSemilla = async () => {
     await mongoose.connect(MONGO_URI);
     console.log('Conectado a MongoDB...');
 
-    // Limpiar usuarios previos si existen
-    await Usuario.deleteMany({});
-    await Role.deleteMany({});
-
     const rolesBase: Array<{ nombre: RoleName; descripcion: string }> = [
       { nombre: 'administrador', descripcion: 'Acceso total al sistema' },
       { nombre: 'coordinador', descripcion: 'Gestion operativa y supervision' },
       { nombre: 'operador', descripcion: 'Acceso limitado a operaciones diarias' },
     ];
 
-    const roles = await Role.insertMany(rolesBase);
+    const roles = [];
+    for (const roleBase of rolesBase) {
+      const role = await Role.findOne({ nombre: roleBase.nombre }) ?? await Role.create(roleBase);
+      roles.push(role);
+    }
     const rolesPorNombre = new Map(roles.map((role) => [role.nombre, role]));
+
+    const parametrosHorario = [
+      { clave: 'horario_inicio_operativo', valor: '07:00', descripcion: 'Hora de apertura del centro logístico' },
+      { clave: 'horario_fin_operativo', valor: '17:00', descripcion: 'Hora de cierre del centro logístico' },
+    ];
+    for (const parametroBase of parametrosHorario) {
+      const existente = await Parametro.findOne({ clave: parametroBase.clave });
+      if (!existente) {
+        await Parametro.create({ ...parametroBase, usuarioCreacion: 'Semilla', usuarioActualizacion: 'Semilla' });
+      }
+    }
 
     const usuariosPrueba: Array<{
       nombres: string;
@@ -37,6 +49,12 @@ const crearUsuarioSemilla = async () => {
     ];
 
     for (const usuario of usuariosPrueba) {
+      const existente = await Usuario.findOne({ email: usuario.email });
+      if (existente) {
+        console.log(`  ${usuario.email} | Ya existe, se conservó sin cambios`);
+        continue;
+      }
+
       const rol = rolesPorNombre.get(usuario.rol);
       if (!rol) {
         throw new Error(`Rol no encontrado: ${usuario.rol}`);

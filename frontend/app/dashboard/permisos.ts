@@ -8,8 +8,12 @@ export type Rol = 'administrador' | 'coordinador' | 'operador';
 export type Permiso =
   | 'proveedores.ver'
   | 'proveedores.crear'
+  | 'proveedores.editar'
+  | 'proveedores.inactivar'
   | 'pedidos.ver'
   | 'pedidos.crear'
+  | 'pedidos.editar'
+  | 'pedidos.cancelar'
   | 'parametros.ver'
   | 'parametros.editar'
   | 'caseta.registrar'
@@ -24,8 +28,12 @@ const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   administrador: [
     'proveedores.ver',
     'proveedores.crear',
+    'proveedores.editar',
+    'proveedores.inactivar',
     'pedidos.ver',
     'pedidos.crear',
+    'pedidos.editar',
+    'pedidos.cancelar',
     'parametros.ver',
     'parametros.editar',
     'caseta.registrar',
@@ -39,8 +47,12 @@ const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   coordinador: [
     'proveedores.ver',
     'proveedores.crear',
+    'proveedores.editar',
+    'proveedores.inactivar',
     'pedidos.ver',
     'pedidos.crear',
+    'pedidos.editar',
+    'pedidos.cancelar',
     'caseta.registrar',
     'mantenimientos.ver',
     'mantenimientos.crear',
@@ -52,8 +64,11 @@ const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
     'proveedores.ver',
     'pedidos.ver',
     'mantenimientos.ver',
+<<<<<<< HEAD
     'auditoria.ver',
     'gateways.ver',
+=======
+>>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
   ],
 };
 

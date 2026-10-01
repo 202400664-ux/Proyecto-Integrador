@@ -20,7 +20,6 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
       contactoNombre,
       telefono,
       emailContacto,
-      usuarioCreacion,
     } = req.body;
 
     // 1. Campos obligatorios
@@ -83,6 +82,7 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const actor = req.usuarioAutenticado!.nombreCompleto;
     const proveedor = await Proveedor.create({
       razonSocial,
       identificacionTributaria,
@@ -92,15 +92,15 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
       emailContacto,
       estado: 'activo',
       activo: true,
-      usuarioCreacion: usuarioCreacion || 'Sistema',
-      usuarioActualizacion: usuarioCreacion || 'Sistema',
+      usuarioCreacion: actor,
+      usuarioActualizacion: actor,
     });
 
     await registrarAuditoria({
       entidad: 'Proveedor',
       accion: 'crear',
       detalle: `Se registró el proveedor ${proveedor.razonSocial} (${proveedor.identificacionTributaria})`,
-      usuario: 'Sistema',
+      usuario: actor,
     });
 
     res.status(201).json({ mensaje: 'Proveedor registrado correctamente', proveedor });
@@ -116,9 +116,23 @@ export const crearProveedor = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const obtenerProveedores = async (_req: Request, res: Response): Promise<void> => {
+export const obtenerProveedores = async (req: Request, res: Response): Promise<void> => {
   try {
-    const proveedores = await Proveedor.find({ activo: true, estado: 'activo' }).sort({ razonSocial: 1 });
+    const categoriaSolicitada = req.query.categoria;
+    let categoria: CategoriaProveedor | undefined;
+    if (categoriaSolicitada !== undefined) {
+      if (typeof categoriaSolicitada !== 'string' || !CATEGORIAS_VALIDAS.includes(categoriaSolicitada as CategoriaProveedor)) {
+        res.status(400).json({ mensaje: `La categoría debe ser una de: ${CATEGORIAS_VALIDAS.join(', ')}` });
+        return;
+      }
+      categoria = categoriaSolicitada as CategoriaProveedor;
+    }
+
+    const proveedores = await Proveedor.find({
+      activo: true,
+      estado: 'activo',
+      ...(categoria ? { categoria } : {}),
+    }).sort({ razonSocial: 1 });
     res.status(200).json({ proveedores });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error interno al listar proveedores', error });
@@ -137,14 +151,14 @@ export const actualizarProveedor = async (req: Request, res: Response): Promise<
     for (const campo of campos) {
       if (req.body[campo] !== undefined) (proveedor as any)[campo] = req.body[campo];
     }
-    proveedor.usuarioActualizacion = req.body.usuarioActualizacion || 'Sistema';
+    proveedor.usuarioActualizacion = req.usuarioAutenticado!.nombreCompleto;
     await proveedor.save();
 
     await registrarAuditoria({
       entidad: 'Proveedor',
       accion: 'actualizar',
       detalle: `Se actualizó el proveedor ${proveedor.razonSocial}`,
-      usuario: proveedor.usuarioActualizacion,
+      usuario: req.usuarioAutenticado!.nombreCompleto,
     });
     res.status(200).json({ mensaje: 'Proveedor actualizado correctamente', proveedor });
   } catch (error: unknown) {
@@ -156,7 +170,7 @@ export const inactivarProveedor = async (req: Request, res: Response): Promise<v
   try {
     const proveedor = await Proveedor.findOneAndUpdate(
       { _id: req.params.id, activo: true },
-      { $set: { activo: false, estado: 'inactivo', usuarioActualizacion: req.body.usuarioActualizacion || 'Sistema' } },
+      { $set: { activo: false, estado: 'inactivo', usuarioActualizacion: req.usuarioAutenticado!.nombreCompleto } },
       { new: true }
     );
     if (!proveedor) {
@@ -167,7 +181,7 @@ export const inactivarProveedor = async (req: Request, res: Response): Promise<v
       entidad: 'Proveedor',
       accion: 'inactivar',
       detalle: `Se inactivó lógicamente el proveedor ${proveedor.razonSocial}`,
-      usuario: proveedor.usuarioActualizacion,
+      usuario: req.usuarioAutenticado!.nombreCompleto,
     });
     res.status(200).json({ mensaje: 'Proveedor inactivado correctamente', proveedor });
   } catch (error) {

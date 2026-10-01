@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useState, FormEvent } from 'react';
-import { ApiError, actualizarPedido, crearPedido, type NuevoPedidoPayload } from '../api';
+import { ApiError, actualizarPedido, crearPedido, obtenerHorarioOperativo, type HorarioOperativo, type NuevoPedidoPayload } from '../api';
 import type { ConflictoPedido, Pedido, Proveedor, VentanaAlternativa } from '../types';
 
 interface FormState {
   proveedorId: string;
-  tipoProducto: string;
   fechaHoraProgramada: string;
   inicioVentana: string;
   finVentana: string;
@@ -15,7 +14,6 @@ interface FormState {
 
 const ESTADO_INICIAL: FormState = {
   proveedorId: '',
-  tipoProducto: '',
   fechaHoraProgramada: '',
   inicioVentana: '',
   finVentana: '',
@@ -35,6 +33,21 @@ function formatoLegible(isoOrLocal: string): string {
   return fecha.toLocaleString('es-SV', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function estadoDesdePedido(pedido: Pedido | null | undefined, proveedores: Proveedor[]): FormState {
+  if (!pedido) return ESTADO_INICIAL;
+  const proveedorId = typeof pedido.proveedorId === 'string'
+    ? pedido.proveedorId
+    : pedido.proveedorId?._id ?? '';
+  return {
+    numeroPedido: pedido.numeroPedido,
+    proveedorId: proveedores.some((proveedor) => proveedor._id === proveedorId) ? proveedorId : '',
+    fechaHoraProgramada: aDatetimeLocal(new Date(pedido.inicioVentana)),
+    inicioVentana: aDatetimeLocal(new Date(pedido.inicioVentana)),
+    finVentana: aDatetimeLocal(new Date(pedido.finVentana)),
+    duracionEstimadaMinutos: String(pedido.duracionEstimadaMinutos),
+  };
+}
+
 interface PedidoFormProps {
   proveedores: Proveedor[];
   onPedidoCreado: (pedido: Pedido) => void;
@@ -44,14 +57,23 @@ interface PedidoFormProps {
   limpiarMensaje?: number;
 }
 
+<<<<<<< HEAD
 export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, onPedidoActualizado, onCancelarEdicion, limpiarMensaje = 0 }: PedidoFormProps) {
   const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
+=======
+export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, onPedidoActualizado, onCancelarEdicion }: PedidoFormProps) {
+  const [form, setForm] = useState<FormState>(() => estadoDesdePedido(pedidoEditar, proveedores));
+  const [horarioOperativo, setHorarioOperativo] = useState<HorarioOperativo>({ inicio: '07:00', fin: '17:00' });
+>>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
   const [conflicto, setConflicto] = useState<ConflictoPedido | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const proveedorSeleccionado = proveedores.find((proveedor) => proveedor._id === form.proveedorId);
+  const tipoProducto = proveedorSeleccionado?.categoria ?? '';
 
   useEffect(() => {
+<<<<<<< HEAD
     if (limpiarMensaje > 0) {
       setExito('');
       setError('');
@@ -73,6 +95,18 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
       duracionEstimadaMinutos: String(pedidoEditar.duracionEstimadaMinutos),
     });
   }, [pedidoEditar]);
+=======
+    let activo = true;
+    obtenerHorarioOperativo()
+      .then((horario) => {
+        if (activo) setHorarioOperativo(horario);
+      })
+      .catch(() => undefined);
+    return () => {
+      activo = false;
+    };
+  }, []);
+>>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 
   const handleChange = (campo: keyof FormState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -93,6 +127,10 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
       }
       return siguiente;
     });
+  };
+
+  const handleProveedorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setForm((prev) => ({ ...prev, proveedorId: e.target.value }));
   };
 
   const aplicarAlternativa = (alternativa: VentanaAlternativa) => {
@@ -116,7 +154,7 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
     // aparte, así que se deriva automáticamente para no duplicar el dato en el formulario.
     const payload: NuevoPedidoPayload = {
       proveedorId: form.proveedorId,
-      tipoProducto: form.tipoProducto,
+      tipoProducto,
       fechaHoraProgramada: form.inicioVentana ? new Date(form.inicioVentana).toISOString() : '',
       inicioVentana: form.inicioVentana ? new Date(form.inicioVentana).toISOString() : '',
       finVentana: form.finVentana ? new Date(form.finVentana).toISOString() : '',
@@ -180,7 +218,7 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
           <select
             className="form-select"
             value={form.proveedorId}
-            onChange={handleChange('proveedorId')}
+            onChange={handleProveedorChange}
             required
           >
             <option value="" disabled>
@@ -196,18 +234,13 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
 
         <div className="col-md-6">
           <label className="form-label">Tipo de producto</label>
-          <select
-            className="form-select"
-            value={form.tipoProducto}
-            onChange={handleChange('tipoProducto')}
-            required
-          >
-            <option value="" disabled>
-              Seleccione un tipo
-            </option>
-            <option value="construcción">Construcción</option>
-            <option value="general">General</option>
-          </select>
+          <input
+            className="form-control"
+            value={tipoProducto ? `${tipoProducto[0].toUpperCase()}${tipoProducto.slice(1)}` : ''}
+            placeholder="Se define al seleccionar proveedor"
+            readOnly
+            aria-readonly="true"
+          />
         </div>
 
         <div className="col-md-6">
@@ -247,7 +280,7 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
       </div>
 
       <p className="text-secondary small mt-3 mb-0">
-        Horario operativo del centro: lunes a sábado, 7:00 a.m. – 5:00 p.m.
+        Horario operativo del centro: lunes a sábado, {horarioOperativo.inicio}–{horarioOperativo.fin}.
       </p>
 
       <div className="pedido-form-actions">
