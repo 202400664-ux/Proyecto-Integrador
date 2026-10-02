@@ -69,6 +69,8 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pestanaActiva, setPestanaActiva] = useState<PestanaDashboard>('inicio');
+  const [navegacionSeleccionada, setNavegacionSeleccionada] = useState(false);
+  const pestanaVisible = rol === 'coordinador' && !navegacionSeleccionada ? 'gateways' : pestanaActiva;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -88,10 +90,16 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
   }, [router]);
 
   useEffect(() => {
-    const onShowHome = () => setPestanaActiva('inicio');
+    const onShowHome = () => {
+      setNavegacionSeleccionada(true);
+      setPestanaActiva('inicio');
+    };
     const onSelectTab = (event: Event) => {
       const pestana = (event as CustomEvent<PestanaDashboard>).detail;
-      if (pestana) setPestanaActiva(pestana);
+      if (pestana) {
+        setNavegacionSeleccionada(true);
+        setPestanaActiva(pestana);
+      }
     };
 
     window.addEventListener('dashboard:show-home', onShowHome);
@@ -110,6 +118,8 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
   };
 
   const navegar = (pestana: PestanaDashboard) => {
+    setNavegacionSeleccionada(true);
+    setPestanaActiva(pestana);
     if (pestana === 'inicio') {
       window.dispatchEvent(new Event('dashboard:show-home'));
     } else {
@@ -170,7 +180,7 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
           <Sidebar
             rol={rol}
             abierto={sidebarOpen}
-            pestanaActiva={pestanaActiva}
+            pestanaActiva={pestanaVisible}
             onNavegar={navegar}
             onCerrar={() => setSidebarOpen(false)}
           />

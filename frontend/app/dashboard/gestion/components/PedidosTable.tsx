@@ -29,6 +29,8 @@ function formatoLegible(iso: string): string {
  * 3. Si NO se ha registrado llegada pero aún está en plazo (PROGRAMADO).
  */
 function obtenerInfoEstado(p: Pedido): { texto: string; clase: string } {
+  if (p.estado === 'DESCARGANDO') return { texto: p.estado, clase: 'bg-danger' };
+  if (p.estado === 'FINALIZADO') return { texto: p.estado, clase: 'bg-success' };
   const fechaLlegada = p.fechaHoraLlegadaReal;
 
   // Si ya tiene registrada fecha/hora de llegada real
@@ -112,7 +114,7 @@ export default function PedidosTable({ pedidos, proveedores, cargando, puedeEdit
                     {(puedeEditar || puedeCancelar) && (
                       <td className="text-nowrap">
                         {yaEntregado ? (
-                          <small className="text-secondary fw-semibold">Ya entregado</small>
+                          <small className="text-secondary fw-semibold">{p.estado === 'DESCARGANDO' ? 'Descarga activa' : p.estado === 'FINALIZADO' ? 'Descarga finalizada' : 'Ya arribó'}</small>
                         ) : (
                           <>
                             {puedeEditar && <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => onEditar(p)}>Editar</button>}

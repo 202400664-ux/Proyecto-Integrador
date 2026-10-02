@@ -9,7 +9,8 @@ export type PestanaDashboard =
   | 'caseta'
   | 'mantenimientos'
   | 'auditoria'
-  | 'parametros';
+  | 'parametros'
+  | 'gateways';
 
 interface SidebarProps {
   rol: Rol;
@@ -24,6 +25,7 @@ const MENU_ITEMS: Array<{ key: PestanaDashboard; label: string; icon: string }> 
   { key: 'proveedores', label: 'Proveedores', icon: '▣' },
   { key: 'pedidos', label: 'Pedidos', icon: '▤' },
   { key: 'caseta', label: 'Caseta', icon: '◫' },
+  { key: 'gateways', label: 'Gateways', icon: '▦' },
   { key: 'auditoria', label: 'Auditoría', icon: '◌' },
 ];
 

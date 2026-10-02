@@ -12,8 +12,9 @@ import CasetaArribosForm from './components/CasetaArribosForm';
 import MantenimientosPanel from './components/MantenimientosPanel';
 import AuditoriaPanel from './components/AuditoriaPanel';
 import ParametrosPanel from './components/ParametrosPanel';
+import GatewaysPanel from './components/GatewaysPanel';
 
-type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'mantenimientos' | 'auditoria' | 'parametros';
+type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'mantenimientos' | 'auditoria' | 'parametros' | 'gateways';
 
 /**
  * Panel único de Proveedores/Pedidos/Caseta para TODOS los roles.
@@ -24,8 +25,8 @@ type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'mantenimientos
  * controlado centralmente en `permisos.ts` a través de `useRol().puede(...)`.
  */
 export default function GestionPanel() {
-  const { puede } = useRol();
-  const [pestana, setPestana] = useState<Pestana>('inicio');
+  const { puede, rol } = useRol();
+  const [pestana, setPestana] = useState<Pestana>(rol === 'coordinador' ? 'gateways' : 'inicio');
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [proveedoresTabla, setProveedoresTabla] = useState<Proveedor[]>([]);
@@ -101,7 +102,7 @@ export default function GestionPanel() {
     const onShowHome = () => setPestana('inicio');
     const onSelectTab = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
-      if (detail && ['inicio', 'proveedores', 'pedidos', 'caseta', 'parametros', 'mantenimientos', 'auditoria'].includes(detail)) {
+      if (detail && ['inicio', 'proveedores', 'pedidos', 'caseta', 'parametros', 'mantenimientos', 'auditoria', 'gateways'].includes(detail)) {
         setPestana(detail as Pestana);
       }
     };
@@ -267,6 +268,8 @@ export default function GestionPanel() {
       {pestana === 'parametros' && puede('parametros.ver') && <ParametrosPanel puedeGestionar={puede('parametros.editar')} />}
 
       {pestana === 'mantenimientos' && <MantenimientosPanel />}
+
+      {pestana === 'gateways' && <GatewaysPanel puedeAdministrar={puede('gateways.crear')} />}
 
       {pestana === 'auditoria' && puede('auditoria.ver') && <AuditoriaPanel />}
     </div>

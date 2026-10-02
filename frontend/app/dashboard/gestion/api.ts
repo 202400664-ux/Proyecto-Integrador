@@ -1,4 +1,4 @@
-import type { Categoria, Pedido, Proveedor } from './types';
+import type { Categoria, Descarga, Gateway, Pedido, Proveedor } from './types';
 
 export const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -17,7 +17,6 @@ export interface NuevoProveedorPayload {
 }
 
 export interface NuevoPedidoPayload {
-  numeroPedido: string;
   proveedorId: string;
   tipoProducto: string;
   fechaHoraProgramada: string;
@@ -167,4 +166,70 @@ export async function registrarArribo(numeroPedido: string) {
   }
 
   return data;
+}
+
+export interface NuevoGatewayPayload {
+  numeroGateway: number;
+  tipoCargaPermitida: Categoria;
+  estado?: Gateway['estado'];
+}
+
+export async function obtenerGateways(): Promise<Gateway[]> {
+  const response = await fetch(`${API_BASE_URL}/gateways`, { headers: encabezadosAutenticados() });
+  const data = await parseOrThrow<{ gateways: Gateway[] }>(response);
+  return data.gateways;
+}
+
+export async function crearGateway(payload: NuevoGatewayPayload): Promise<Gateway> {
+  const response = await fetch(`${API_BASE_URL}/gateways`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...encabezadosAutenticados() },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseOrThrow<{ gateway: Gateway }>(response);
+  return data.gateway;
+}
+
+export async function actualizarGateway(id: string, payload: Partial<NuevoGatewayPayload>): Promise<Gateway> {
+  const response = await fetch(`${API_BASE_URL}/gateways/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...encabezadosAutenticados() },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseOrThrow<{ gateway: Gateway }>(response);
+  return data.gateway;
+}
+
+export async function inactivarGateway(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/gateways/${id}`, {
+    method: 'DELETE',
+    headers: encabezadosAutenticados(),
+  });
+  await parseOrThrow(response);
+}
+
+export async function obtenerDescargasActivas(): Promise<Descarga[]> {
+  const response = await fetch(`${API_BASE_URL}/descargas`, { headers: encabezadosAutenticados() });
+  const data = await parseOrThrow<{ descargas: Descarga[] }>(response);
+  return data.descargas;
+}
+
+export async function iniciarDescarga(pedidoId: string, gatewayId: string): Promise<Descarga> {
+  const response = await fetch(`${API_BASE_URL}/descargas/iniciar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...encabezadosAutenticados() },
+    body: JSON.stringify({ pedidoId, gatewayId }),
+  });
+  const data = await parseOrThrow<{ descarga: Descarga }>(response);
+  return data.descarga;
+}
+
+export async function finalizarDescarga(descargaId: string): Promise<Descarga> {
+  const response = await fetch(`${API_BASE_URL}/descargas/finalizar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...encabezadosAutenticados() },
+    body: JSON.stringify({ descargaId }),
+  });
+  const data = await parseOrThrow<{ descarga: Descarga }>(response);
+  return data.descarga;
 }

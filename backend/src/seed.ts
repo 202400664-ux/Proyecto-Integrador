@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { Usuario } from './models/Usuario.js';
 import { Role, type RoleName } from './models/Role.js';
 import { Parametro } from './models/Parametro.js';
+import { Gateway } from './models/Gateway.js';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ const crearUsuarioSemilla = async () => {
     const rolesPorNombre = new Map(roles.map((role) => [role.nombre, role]));
 
     const parametrosHorario = [
+      { clave: 'numero_equipo', valor: '04', descripcion: 'Número del equipo para generar identificadores correlativos de pedidos' },
       { clave: 'horario_inicio_operativo', valor: '07:00', descripcion: 'Hora de apertura del centro logístico' },
       { clave: 'horario_fin_operativo', valor: '17:00', descripcion: 'Hora de cierre del centro logístico' },
     ];
@@ -35,6 +37,22 @@ const crearUsuarioSemilla = async () => {
       if (!existente) {
         await Parametro.create({ ...parametroBase, usuarioCreacion: 'Semilla', usuarioActualizacion: 'Semilla' });
       }
+    }
+
+    for (let numeroGateway = 1; numeroGateway <= 5; numeroGateway += 1) {
+      await Gateway.updateOne(
+        { numeroGateway },
+        {
+          $setOnInsert: {
+            tipoCargaPermitida: numeroGateway === 5 ? 'construcción' : 'general',
+            estado: 'LIBRE',
+            activo: true,
+            usuarioCreacion: 'Semilla',
+            usuarioActualizacion: 'Semilla',
+          },
+        },
+        { upsert: true }
+      );
     }
 
     const usuariosPrueba: Array<{

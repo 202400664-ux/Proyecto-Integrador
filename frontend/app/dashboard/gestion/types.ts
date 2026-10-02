@@ -1,4 +1,5 @@
 export type Categoria = 'construcción' | 'general';
+export type EstadoGateway = 'LIBRE' | 'OCUPADO' | 'FUERA DE SERVICIO';
 
 export interface Proveedor {
   _id: string;
@@ -27,8 +28,26 @@ export interface Pedido {
   inicioVentana: string;
   finVentana: string;
   duracionEstimadaMinutos: number;
-  estado: 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'CANCELADO';
+  estado: 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'EN COLA' | 'DESCARGANDO' | 'FINALIZADO' | 'CANCELADO';
   fechaHoraLlegadaReal?: string;
+}
+
+export interface Gateway {
+  _id: string;
+  numeroGateway: number;
+  tipoCargaPermitida: Categoria;
+  estado: EstadoGateway;
+  activo: boolean;
+}
+
+export interface Descarga {
+  _id: string;
+  gatewayId: string;
+  pedidoId: Pedido | string;
+  operadorId: string;
+  fechaHoraInicio: string;
+  fechaHoraFin?: string;
+  duracionMinutos?: number;
 }
 
 export interface VentanaAlternativa {

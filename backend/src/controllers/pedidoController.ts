@@ -3,6 +3,7 @@ import { isValidObjectId } from 'mongoose';
 import { Pedido } from '../models/Pedido.js';
 import { Proveedor } from '../models/Proveedor.js';
 import { Parametro } from '../models/Parametro.js';
+import { ContadorPedido } from '../models/ContadorPedido.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { marcarPedidosAusentes } from './llegadasController.js';
 
@@ -13,6 +14,34 @@ interface HorarioOperativo {
 
 const HORARIO_POR_DEFECTO: HorarioOperativo = { inicio: 7 * 60, fin: 17 * 60 };
 const CLAVES_HORARIO = ['horario_inicio_operativo', 'horario_fin_operativo'] as const;
+
+async function generarNumeroPedido(): Promise<string> {
+  const parametro = await Parametro.findOne({ clave: 'numero_equipo', activo: true });
+  const equipoConfigurado = parametro?.valor.trim();
+  if (!equipoConfigurado || !/^\d{1,2}$/.test(equipoConfigurado)) {
+    throw new Error('Configure el parámetro numero_equipo con un valor numérico de uno o dos dígitos');
+  }
+
+  const equipo = equipoConfigurado.padStart(2, '0');
+  const prefijo = `PED-EQUI${equipo}-`;
+  const existentes = await Pedido.countDocuments({ numeroPedido: { $regex: `^${prefijo}` } });
+  const ultimoPedido = await Pedido.findOne({ numeroPedido: { $regex: new RegExp(`^${prefijo}[0-9]{9}$`) } })
+    .sort({ numeroPedido: -1 })
+    .select('numeroPedido');
+  const ultimoCorrelativo = ultimoPedido ? Number(ultimoPedido.numeroPedido.slice(prefijo.length)) : 0;
+  await ContadorPedido.updateOne(
+    { equipo },
+    { $max: { secuencia: Math.max(existentes, ultimoCorrelativo) }, $setOnInsert: { equipo } },
+    { upsert: true }
+  );
+  const contador = await ContadorPedido.findOneAndUpdate(
+    { equipo },
+    { $inc: { secuencia: 1 } },
+    { new: true }
+  );
+  if (!contador || contador.secuencia > 999999999) throw new Error('Se agotó la secuencia de pedidos del equipo');
+  return `${prefijo}${String(contador.secuencia).padStart(9, '0')}`;
+}
 
 function minutosDesdeMedianoche(valor: string | undefined, porDefecto: number): number {
   if (!valor) return porDefecto;
@@ -129,7 +158,6 @@ const generarAlternativas = async (
 export const crearPedido = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
-      numeroPedido,
       proveedorId,
       tipoProducto,
       fechaHoraProgramada,
@@ -139,7 +167,7 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
     } = req.body;
 
     // Validación de campos requeridos
-    if (!numeroPedido || !proveedorId || !tipoProducto || !fechaHoraProgramada || !inicioVentana || !finVentana || !duracionEstimadaMinutos) {
+    if (!proveedorId || !tipoProducto || !fechaHoraProgramada || !inicioVentana || !finVentana || !duracionEstimadaMinutos) {
       res.status(400).json({ mensaje: 'Faltan campos obligatorios' });
       return;
     }
@@ -220,12 +248,7 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Verifica unicidad de numeroPedido con mensaje claro (además del índice único)
-    const yaExiste = await Pedido.findOne({ numeroPedido });
-    if (yaExiste) {
-      res.status(409).json({ mensaje: 'Ya existe un pedido con ese número' });
-      return;
-    }
+    const numeroPedido = await generarNumeroPedido();
 
     const nuevoPedido = await Pedido.create({
       numeroPedido,
@@ -252,6 +275,11 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       pedido: nuevoPedido,
     });
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Configure el parámetro numero_equipo')) {
+      res.status(503).json({ mensaje: error.message });
+      return;
+    }
+    console.error('Error al programar pedido:', error);
     res.status(500).json({ mensaje: 'Error interno en el servidor', error });
   }
 };

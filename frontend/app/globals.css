@@ -374,6 +374,154 @@ body {
   font-weight: 600;
 }
 
+.gateway-monitor-header,
+.gateway-unit-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.gateway-monitor-header {
+  margin-bottom: 1.25rem;
+}
+
+.gateway-monitor-kicker,
+.gateway-number-label {
+  margin: 0 0 0.25rem;
+  color: #647b89;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.gateway-monitor-header h2 {
+  margin: 0;
+  color: #123149;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.gateway-refresh-state {
+  color: #47637a;
+  font-size: 0.82rem;
+}
+
+.gateway-admin-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.gateway-admin-tools .form-select {
+  width: auto;
+  min-width: 7rem;
+}
+
+.gateway-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+}
+
+.gateway-unit {
+  min-width: 0;
+  min-height: 18rem;
+  display: flex;
+  flex-direction: column;
+  padding: 1.1rem;
+  border: 1px solid;
+  border-left-width: 5px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.gateway-unit.libre {
+  border-color: #b9dbc8;
+  border-left-color: #23834d;
+  background: linear-gradient(150deg, #fff 55%, #eef8f1);
+}
+
+.gateway-unit.ocupado {
+  border-color: #e5b9b5;
+  border-left-color: #c43d36;
+  background: linear-gradient(150deg, #fff 55%, #fff0ee);
+}
+
+.gateway-unit.fuera-servicio {
+  border-color: #ccd1d5;
+  border-left-color: #6d747a;
+  background: linear-gradient(150deg, #fff 55%, #f0f1f2);
+}
+
+.gateway-unit-heading h3 {
+  margin: 0;
+  color: #123149;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.gateway-state-badge {
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: #edf0f2;
+  color: #28343b;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.gateway-unit.libre .gateway-state-badge { background: #d9f0e1; color: #176137; }
+.gateway-unit.ocupado .gateway-state-badge { background: #f9dedb; color: #922d27; }
+.gateway-unit.fuera-servicio .gateway-state-badge { background: #e1e4e6; color: #525b61; }
+
+.gateway-cargo {
+  margin: 0.75rem 0 1.1rem;
+  color: #47637a;
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.gateway-operation,
+.gateway-active-order {
+  margin-top: auto;
+}
+
+.gateway-active-order span {
+  display: block;
+  color: #6d3a35;
+  font-size: 0.8rem;
+}
+
+.gateway-active-order strong {
+  display: block;
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+.gateway-maintenance-note {
+  margin-top: auto;
+  color: #525b61;
+  font-weight: 700;
+}
+
+.gateway-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(18, 49, 73, 0.1);
+}
+
+@media (max-width: 576px) {
+  .gateway-monitor-header { align-items: flex-start; flex-direction: column; }
+  .gateway-admin-tools { align-items: stretch; flex-direction: column; }
+  .gateway-admin-tools .form-select { width: 100%; }
+}
+
 .dashboard-panel .btn-primary {
   background: linear-gradient(135deg, #1d78a8, #123149);
   border: none;

@@ -19,7 +19,12 @@ export type Permiso =
   | 'caseta.registrar'
   | 'mantenimientos.ver'
   | 'mantenimientos.crear'
-  | 'auditoria.ver';
+  | 'auditoria.ver'
+  | 'gateways.ver'
+  | 'gateways.crear'
+  | 'gateways.editar'
+  | 'gateways.inactivar'
+  | 'descargas.operar';
 
 const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   administrador: [
@@ -37,6 +42,11 @@ const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
     'mantenimientos.ver',
     'mantenimientos.crear',
     'auditoria.ver',
+    'gateways.ver',
+    'gateways.crear',
+    'gateways.editar',
+    'gateways.inactivar',
+    'descargas.operar',
   ],
   coordinador: [
     'proveedores.ver',
@@ -51,11 +61,15 @@ const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
     'mantenimientos.ver',
     'mantenimientos.crear',
     'auditoria.ver',
+    'gateways.ver',
+    'descargas.operar',
   ],
   operador: [
     'proveedores.ver',
     'pedidos.ver',
     'mantenimientos.ver',
+    'gateways.ver',
+    'descargas.operar',
   ],
 };
 

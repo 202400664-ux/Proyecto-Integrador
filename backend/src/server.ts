@@ -9,6 +9,8 @@ import llegadasRoutes from './routes/llegadas.js';
 import mantenimientosRoutes from './routes/mantenimientos.js';
 import auditoriaRoutes from './routes/auditoria.js';
 import parametrosRoutes from './routes/parametros.js';
+import gatewaysRoutes from './routes/gateways.js';
+import descargasRoutes from './routes/descargas.js';
 
 dotenv.config();
 
@@ -33,6 +35,8 @@ app.use('/api/llegadas', llegadasRoutes);
 app.use('/api/mantenimientos', mantenimientosRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/parametros', parametrosRoutes);
+app.use('/api/gateways', gatewaysRoutes);
+app.use('/api/descargas', descargasRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor backend corriendo en el puerto ${PORT}`);

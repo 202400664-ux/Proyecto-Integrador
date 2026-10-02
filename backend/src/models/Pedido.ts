@@ -1,7 +1,7 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
 
 export type TipoProducto = 'construcción' | 'general';
-export type EstadoPedido = 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'CANCELADO';
+export type EstadoPedido = 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'EN COLA' | 'DESCARGANDO' | 'FINALIZADO' | 'CANCELADO';
 
 export interface IPedido extends Document {
   numeroPedido: string;
@@ -60,7 +60,7 @@ const pedidoSchema = new Schema<IPedido>(
     },
     estado: {
       type: String,
-      enum: ['PROGRAMADO', 'ANTICIPADO', 'A TIEMPO', 'TARDÍO', 'AUSENTE', 'CANCELADO'] satisfies EstadoPedido[],
+      enum: ['PROGRAMADO', 'ANTICIPADO', 'A TIEMPO', 'TARDÍO', 'AUSENTE', 'EN COLA', 'DESCARGANDO', 'FINALIZADO', 'CANCELADO'] satisfies EstadoPedido[],
       default: 'PROGRAMADO',
     },
     activo: {

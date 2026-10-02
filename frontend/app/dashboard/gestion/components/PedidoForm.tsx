@@ -5,7 +5,6 @@ import { ApiError, actualizarPedido, crearPedido, obtenerHorarioOperativo, type 
 import type { ConflictoPedido, Pedido, Proveedor, VentanaAlternativa } from '../types';
 
 interface FormState {
-  numeroPedido: string;
   proveedorId: string;
   fechaHoraProgramada: string;
   inicioVentana: string;
@@ -14,7 +13,6 @@ interface FormState {
 }
 
 const ESTADO_INICIAL: FormState = {
-  numeroPedido: '',
   proveedorId: '',
   fechaHoraProgramada: '',
   inicioVentana: '',
@@ -41,7 +39,6 @@ function estadoDesdePedido(pedido: Pedido | null | undefined, proveedores: Prove
     ? pedido.proveedorId
     : pedido.proveedorId?._id ?? '';
   return {
-    numeroPedido: pedido.numeroPedido,
     proveedorId: proveedores.some((proveedor) => proveedor._id === proveedorId) ? proveedorId : '',
     fechaHoraProgramada: aDatetimeLocal(new Date(pedido.inicioVentana)),
     inicioVentana: aDatetimeLocal(new Date(pedido.inicioVentana)),
@@ -110,7 +107,6 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
     // fechaHoraProgramada corresponde al inicio de la ventana: no tiene sentido pedirlo
     // aparte, así que se deriva automáticamente para no duplicar el dato en el formulario.
     const payload: NuevoPedidoPayload = {
-      numeroPedido: form.numeroPedido,
       proveedorId: form.proveedorId,
       tipoProducto,
       fechaHoraProgramada: form.inicioVentana ? new Date(form.inicioVentana).toISOString() : '',
@@ -171,17 +167,6 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
       )}
 
       <div className="row g-3">
-        <div className="col-md-6">
-          <label className="form-label">Número de pedido</label>
-          <input
-            type="text"
-            className="form-control"
-            value={form.numeroPedido}
-            onChange={handleChange('numeroPedido')}
-            required
-          />
-        </div>
-
         <div className="col-md-6">
           <label className="form-label">Proveedor</label>
           <select
@@ -249,6 +234,9 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
 
       <p className="text-secondary small mt-3 mb-0">
         Horario operativo del centro: lunes a sábado, {horarioOperativo.inicio}–{horarioOperativo.fin}.
+      </p>
+      <p className="text-secondary small mt-2 mb-0">
+        {pedidoEditar ? `Identificador: ${pedidoEditar.numeroPedido}` : 'El número correlativo PED-EQUI se asignará automáticamente al guardar.'}
       </p>
 
       <button type="submit" className="btn btn-primary mt-3 align-self-start px-4" disabled={enviando}>
