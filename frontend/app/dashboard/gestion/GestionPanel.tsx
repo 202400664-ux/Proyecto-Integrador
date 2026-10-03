@@ -217,10 +217,9 @@ export default function GestionPanel() {
           {mensajePedido && <div className="alert alert-success" role="status">{mensajePedido}</div>}
           {puede('pedidos.crear') && (
             <PedidoForm
-              key={pedidoEditar?._id ?? 'nuevo'}
+              key={`${pedidoEditar?._id ?? 'nuevo'}-${limpiarMensajePedido}`}
               proveedores={proveedores}
               pedidoEditar={pedidoEditar}
-              limpiarMensaje={limpiarMensajePedido}
               onCancelarEdicion={() => setPedidoEditar(null)}
               onPedidoActualizado={(actualizado) => {
                 setPedidos((prev) => prev.map((item) => item._id === actualizado._id ? actualizado : item));

@@ -64,11 +64,9 @@ const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
     'proveedores.ver',
     'pedidos.ver',
     'mantenimientos.ver',
-<<<<<<< HEAD
     'auditoria.ver',
     'gateways.ver',
-=======
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
+    'descargas.operar',
   ],
 };
 

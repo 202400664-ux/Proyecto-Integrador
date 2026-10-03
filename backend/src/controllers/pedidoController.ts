@@ -2,11 +2,8 @@ import { Request, Response } from 'express';
 import { isValidObjectId } from 'mongoose';
 import { Pedido } from '../models/Pedido.js';
 import { Proveedor } from '../models/Proveedor.js';
-<<<<<<< HEAD
 import { Gateway } from '../models/Gateway.js';
-=======
 import { Parametro } from '../models/Parametro.js';
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 import { registrarAuditoria } from './auditoriaController.js';
 import { marcarPedidosAusentes } from './llegadasController.js';
 import { ContadorPedido } from '../models/ContadorPedido.js';
@@ -57,34 +54,40 @@ const dentroDelHorarioOperativo = (inicio: Date, fin: Date, horario: HorarioOper
   return horaInicio >= horario.inicio && horaFin <= horario.fin;
 };
 
-<<<<<<< HEAD
-// Revisa si dos ventanas de tiempo se traslapan
-const seTraslapan = (inicioA: Date, finA: Date, inicioB: Date, finB: Date): boolean =>
-  inicioA < finB && inicioB < finA;
-
-const EQUIPO_CONFIGURADO = Number(process.env.EQUIPO_NUMERO);
-const EQUIPO_NUMERO = Number.isInteger(EQUIPO_CONFIGURADO) && EQUIPO_CONFIGURADO >= 1 && EQUIPO_CONFIGURADO <= 99
-  ? EQUIPO_CONFIGURADO
-  : 4;
-
 export async function generarNumeroPedido(): Promise<string> {
+  const parametroEquipo = await Parametro.findOne({ clave: 'numero_equipo', activo: true });
+  const valorEquipo = parametroEquipo?.valor.trim();
+  if (!valorEquipo || !/^\d{1,2}$/.test(valorEquipo)) {
+    throw new Error('Configure el parámetro numero_equipo con un número de equipo entre 1 y 99');
+  }
+
+  const equipo = Number(valorEquipo);
+  const prefijo = `PED-EQUI${String(equipo).padStart(2, '0')}-`;
+  const ultimoPedido = await Pedido.findOne({ numeroPedido: { $regex: new RegExp(`^${prefijo}[0-9]{9}$`) } })
+    .sort({ numeroPedido: -1 })
+    .select('numeroPedido');
+  const ultimoCorrelativo = ultimoPedido ? Number(ultimoPedido.numeroPedido.slice(prefijo.length)) : 0;
+
+  await ContadorPedido.updateOne(
+    { equipo },
+    { $max: { ultimo: ultimoCorrelativo }, $setOnInsert: { equipo } },
+    { upsert: true }
+  );
+
   for (let intento = 0; intento < 100; intento += 1) {
     const contador = await ContadorPedido.findOneAndUpdate(
-      { equipo: EQUIPO_NUMERO },
+      { equipo },
       { $inc: { ultimo: 1 } },
       { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
     );
     if (!contador || contador.ultimo > 999_999_999) {
       throw new Error('Se agotó el rango disponible para el correlativo del equipo');
     }
-    const numero = `PED-EQUI${String(EQUIPO_NUMERO).padStart(2, '0')}-${String(contador.ultimo).padStart(9, '0')}`;
+    const numero = `${prefijo}${String(contador.ultimo).padStart(9, '0')}`;
     if (!(await Pedido.exists({ numeroPedido: numero }))) return numero;
   }
   throw new Error('No se pudo generar un número de pedido único');
 }
-
-=======
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 // Genera hasta 3 ventanas alternativas de la misma duración en días operativos.
 const generarAlternativas = async (
   inicioSolicitado: Date,
@@ -187,15 +190,11 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-<<<<<<< HEAD
-    // --- RN-01: el proveedor debe existir ---
-=======
     // --- RN-01: el proveedor debe existir y estar activo ---
     if (!isValidObjectId(proveedorId)) {
       res.status(400).json({ mensaje: 'El ID del proveedor no es válido' });
       return;
     }
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
     const proveedor = await Proveedor.findOne({ _id: proveedorId, activo: true, estado: 'activo' });
     if (!proveedor) {
       res.status(400).json({ mensaje: 'El proveedor indicado no existe o está inactivo' });
@@ -234,10 +233,6 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-<<<<<<< HEAD
-   // --- RN-02b: sin solapamiento con otro pedido ya programado ---
-    const pedidosDelDia = await Pedido.find({ activo: true, estado: { $ne: 'CANCELADO' } });
-=======
     // --- RN-02b: sin solapamiento con otro pedido ya programado ---
     const pedidoEnConflicto = await Pedido.findOne({
       activo: { $ne: false },
@@ -245,7 +240,6 @@ export const crearPedido = async (req: Request, res: Response): Promise<void> =>
       inicioVentana: { $lt: fin },
       finVentana: { $gt: inicio },
     });
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 
     if (pedidoEnConflicto) {
       const alternativas = await generarAlternativas(inicio, duracionMinutos, horario);
@@ -316,16 +310,6 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-<<<<<<< HEAD
-    const { proveedorId, tipoProducto, inicioVentana, finVentana, duracionEstimadaMinutos } = req.body;
-    if (proveedorId !== undefined) {
-      const proveedor = await Proveedor.findOne({ _id: proveedorId, activo: true, estado: 'activo' });
-      if (!proveedor) {
-        res.status(400).json({ mensaje: 'El proveedor indicado no existe o está inactivo' });
-        return;
-      }
-      (pedido as any).proveedorId = proveedor._id;
-=======
     const proveedorId = req.body.proveedorId ?? String(pedido.proveedorId);
     if (!isValidObjectId(proveedorId)) {
       res.status(400).json({ mensaje: 'El ID del proveedor no es válido' });
@@ -335,7 +319,6 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
     if (!proveedor) {
       res.status(400).json({ mensaje: 'El proveedor indicado no existe o está inactivo' });
       return;
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
     }
 
     const tipoProducto = req.body.tipoProducto ?? pedido.tipoProducto;
@@ -368,27 +351,6 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
       res.status(400).json({ mensaje: 'La ventana no coincide con la duración estimada declarada' });
       return;
     }
-<<<<<<< HEAD
-    const duracionRealMinutos = (pedido.finVentana.getTime() - pedido.inicioVentana.getTime()) / 60000;
-    if (duracionRealMinutos !== Number(pedido.duracionEstimadaMinutos)) {
-      res.status(400).json({ mensaje: 'La duración estimada debe coincidir con la duración de la ventana' });
-      return;
-    }
-    const pedidosActivos = await Pedido.find({
-      _id: { $ne: pedido._id },
-      activo: true,
-      estado: { $ne: 'CANCELADO' },
-    });
-    const conflicto = pedidosActivos.find((existente) =>
-      seTraslapan(pedido.inicioVentana, pedido.finVentana, existente.inicioVentana, existente.finVentana)
-    );
-    if (conflicto) {
-      const alternativas = await generarAlternativas(pedido.inicioVentana, Number(pedido.duracionEstimadaMinutos), String(pedido._id));
-      res.status(409).json({
-        mensaje: 'La ventana solicitada se traslapa con otro pedido ya programado',
-        conflictoCon: { numeroPedido: conflicto.numeroPedido, inicioVentana: conflicto.inicioVentana, finVentana: conflicto.finVentana },
-=======
-
     const horario = await obtenerHorarioOperativo();
     if (!dentroDelHorarioOperativo(inicio, fin, horario)) {
       res.status(400).json({ mensaje: 'La ventana está fuera del horario operativo, de lunes a sábado' });
@@ -411,20 +373,16 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
           inicioVentana: pedidoEnConflicto.inicioVentana,
           finVentana: pedidoEnConflicto.finVentana,
         },
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
         ventanasAlternativas: alternativas,
       });
       return;
     }
-<<<<<<< HEAD
-=======
 
     pedido.proveedorId = proveedor._id;
     pedido.tipoProducto = tipoProducto;
     pedido.inicioVentana = inicio;
     pedido.finVentana = fin;
     pedido.duracionEstimadaMinutos = duracionMinutos;
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
     pedido.fechaHoraProgramada = pedido.inicioVentana;
     pedido.usuarioActualizacion = req.usuarioAutenticado!.nombreCompleto;
     await pedido.save();

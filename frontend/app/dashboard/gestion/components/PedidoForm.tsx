@@ -39,7 +39,6 @@ function estadoDesdePedido(pedido: Pedido | null | undefined, proveedores: Prove
     ? pedido.proveedorId
     : pedido.proveedorId?._id ?? '';
   return {
-    numeroPedido: pedido.numeroPedido,
     proveedorId: proveedores.some((proveedor) => proveedor._id === proveedorId) ? proveedorId : '',
     fechaHoraProgramada: aDatetimeLocal(new Date(pedido.inicioVentana)),
     inicioVentana: aDatetimeLocal(new Date(pedido.inicioVentana)),
@@ -57,14 +56,9 @@ interface PedidoFormProps {
   limpiarMensaje?: number;
 }
 
-<<<<<<< HEAD
-export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, onPedidoActualizado, onCancelarEdicion, limpiarMensaje = 0 }: PedidoFormProps) {
-  const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
-=======
 export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, onPedidoActualizado, onCancelarEdicion }: PedidoFormProps) {
   const [form, setForm] = useState<FormState>(() => estadoDesdePedido(pedidoEditar, proveedores));
   const [horarioOperativo, setHorarioOperativo] = useState<HorarioOperativo>({ inicio: '07:00', fin: '17:00' });
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
   const [conflicto, setConflicto] = useState<ConflictoPedido | null>(null);
@@ -73,29 +67,6 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
   const tipoProducto = proveedorSeleccionado?.categoria ?? '';
 
   useEffect(() => {
-<<<<<<< HEAD
-    if (limpiarMensaje > 0) {
-      setExito('');
-      setError('');
-      setConflicto(null);
-    }
-  }, [limpiarMensaje]);
-
-  useEffect(() => {
-    if (!pedidoEditar) {
-      setForm(ESTADO_INICIAL);
-      return;
-    }
-    setForm({
-      proveedorId: typeof pedidoEditar.proveedorId === 'string' ? pedidoEditar.proveedorId : pedidoEditar.proveedorId._id,
-      tipoProducto: pedidoEditar.tipoProducto,
-      fechaHoraProgramada: aDatetimeLocal(new Date(pedidoEditar.inicioVentana)),
-      inicioVentana: aDatetimeLocal(new Date(pedidoEditar.inicioVentana)),
-      finVentana: aDatetimeLocal(new Date(pedidoEditar.finVentana)),
-      duracionEstimadaMinutos: String(pedidoEditar.duracionEstimadaMinutos),
-    });
-  }, [pedidoEditar]);
-=======
     let activo = true;
     obtenerHorarioOperativo()
       .then((horario) => {
@@ -106,7 +77,6 @@ export default function PedidoForm({ proveedores, onPedidoCreado, pedidoEditar, 
       activo = false;
     };
   }, []);
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 
   const handleChange = (campo: keyof FormState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>

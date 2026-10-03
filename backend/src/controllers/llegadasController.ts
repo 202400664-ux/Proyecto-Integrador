@@ -15,10 +15,7 @@ async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Prom
 export const registrarLlegada = async (req: Request, res: Response): Promise<void> => {
   try {
     const { numeroPedido } = req.body;
-<<<<<<< HEAD
-    const usuarioNombre = req.usuario?.nombreCompleto || req.body.usuarioNombre || 'Operador Caseta';
-=======
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
+    const actor = req.usuario?.nombreCompleto || 'Operador Caseta';
 
     const pedido = await Pedido.findOne({ numeroPedido, activo: { $ne: false }, estado: { $ne: 'CANCELADO' } });
     if (!pedido) {
@@ -53,13 +50,8 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
     }
 
     pedido.estado = nuevoEstado;
-<<<<<<< HEAD
     pedido.clasificacionPuntualidad = nuevoEstado;
-    pedido.usuarioActualizacion = usuarioNombre || 'Operador Caseta';
-=======
-    const actor = req.usuarioAutenticado!.nombreCompleto;
     pedido.usuarioActualizacion = actor;
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
     await pedido.save();
 
     await registrarAuditoria({

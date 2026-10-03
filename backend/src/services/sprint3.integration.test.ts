@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { generarNumeroPedido } from '../controllers/pedidoController.js';
 import { Gateway } from '../models/Gateway.js';
 import { Pedido } from '../models/Pedido.js';
+import { Parametro } from '../models/Parametro.js';
 import { reevaluarCola } from './colaPrioridad.js';
 
 const mongoTestUri = process.env.MONGO_TEST_URI;
@@ -16,6 +17,11 @@ test('correlativo evita colisiones y cola respeta compatibilidad y prioridad', {
   try {
     await mongoose.connection.dropDatabase();
     const equipo = Number(process.env.EQUIPO_NUMERO) || 4;
+    await Parametro.create({
+      clave: 'numero_equipo',
+      valor: String(equipo).padStart(2, '0'),
+      descripcion: 'Equipo asignado para el test de correlativo',
+    });
     const codigo = (correlativo: number) => `PED-EQUI${String(equipo).padStart(2, '0')}-${String(correlativo).padStart(9, '0')}`;
 
     await crearPedido(codigo(1), 'general', 'PROGRAMADO');

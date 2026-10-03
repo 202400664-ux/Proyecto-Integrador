@@ -7,6 +7,7 @@ interface RegistroAuditoriaInput {
   accion: string;
   detalle: string;
   usuario?: string;
+  session?: ClientSession;
 }
 
 export const registrarAuditoria = async ({
@@ -14,6 +15,7 @@ export const registrarAuditoria = async ({
   accion,
   detalle,
   usuario = 'Sistema',
+  session,
 }: RegistroAuditoriaInput): Promise<void> => {
   const registro = new Auditoria({
     entidad,

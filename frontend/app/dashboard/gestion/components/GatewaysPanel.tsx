@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   cambiarEstadoGateway,
+  encolarPedido,
   finalizarDescarga,
   inactivarGateway,
   iniciarDescarga,
@@ -11,6 +12,8 @@ import {
   obtenerGateways,
   obtenerGatewaysInactivos,
   obtenerNotificaciones,
+  obtenerPedidos,
+  reevaluarColaPrioridad,
   reactivarGateway,
 } from '../api';
 import type { DescargaActiva, Gateway, Notificacion, Pedido } from '../types';
@@ -26,27 +29,41 @@ const claseEstado: Record<Gateway['estado'], string> = {
   'FUERA DE SERVICIO': 'gateway-offline',
 };
 
+type PedidoEnCola = Pedido & { minutosEnCola: number | null };
+
 export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: GatewaysPanelProps) {
   const [gateways, setGateways] = useState<Gateway[]>([]);
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [gatewaysInactivos, setGatewaysInactivos] = useState<Gateway[]>([]);
-  const [cola, setCola] = useState<Pedido[]>([]);
+  const [cola, setCola] = useState<PedidoEnCola[]>([]);
   const [descargas, setDescargas] = useState<DescargaActiva[]>([]);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState('');
+  const [pedidoPorGateway, setPedidoPorGateway] = useState<Record<string, string>>({});
+  const [actualizando, setActualizando] = useState(false);
   const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
 
   const cargar = useCallback(async () => {
     try {
-      const [listaGateways, listaCola, listaDescargas, listaInactivos, listaNotificaciones] = await Promise.all([
+      const [listaGateways, listaCola, listaDescargas, listaInactivos, listaNotificaciones, listaPedidos] = await Promise.all([
         obtenerGateways(),
         obtenerColaPrioridad(),
         obtenerDescargasActivas(),
         puedeAdministrar ? obtenerGatewaysInactivos() : Promise.resolve([]),
         obtenerNotificaciones(),
+        obtenerPedidos(),
       ]);
       setGateways(listaGateways);
-      setCola(listaCola);
+      setPedidos(listaPedidos);
+      const ahora = Date.now();
+      setCola(listaCola.map((pedido) => ({
+        ...pedido,
+        minutosEnCola: pedido.fechaEntradaCola
+          ? Math.floor((ahora - new Date(pedido.fechaEntradaCola).getTime()) / 60000)
+          : null,
+      })));
       setDescargas(listaDescargas);
       setGatewaysInactivos(listaInactivos);
       setNotificaciones(listaNotificaciones);
@@ -59,9 +76,12 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
   }, [puedeAdministrar]);
 
   useEffect(() => {
-    void cargar();
+    const cargaInicial = window.setTimeout(() => void cargar(), 0);
     const intervalo = window.setInterval(() => void cargar(), 5000);
-    return () => window.clearInterval(intervalo);
+    return () => {
+      window.clearTimeout(cargaInicial);
+      window.clearInterval(intervalo);
+    };
   }, [cargar]);
 
   const ejecutar = async (clave: string, accion: () => Promise<void>) => {
@@ -77,6 +97,22 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
     }
   };
 
+  const actualizarTablero = async () => {
+    setActualizando(true);
+    setError('');
+    setMensaje('');
+    try {
+      await reevaluarColaPrioridad();
+      await cargar();
+      setMensaje('Tablero actualizado y cola reevaluada.');
+      window.setTimeout(() => setMensaje(''), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo reevaluar la cola');
+    } finally {
+      setActualizando(false);
+    }
+  };
+
   if (cargando) return <div className="card p-4">Cargando gateways y cola...</div>;
 
   return (
@@ -87,12 +123,13 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
           <h2 className="h4 mb-1">Gateways de descarga</h2>
           <p className="text-secondary mb-0">Disponibilidad, asignación y avance de descargas</p>
         </div>
-        <button type="button" className="btn btn-outline-primary" onClick={() => void cargar()}>
-          Actualizar
+        <button type="button" className="btn btn-outline-primary" disabled={actualizando} onClick={() => void actualizarTablero()}>
+          {actualizando ? 'Actualizando...' : 'Actualizar'}
         </button>
       </header>
 
       {error && <div className="alert alert-danger" role="alert">{error}</div>}
+      {mensaje && <div className="alert alert-success py-2" role="status">{mensaje}</div>}
 
       {notificaciones.length > 0 && (
         <div className="gateway-notifications" aria-live="polite">
@@ -112,6 +149,14 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
           const asignado = gateway.pedidoAsignado;
           const descarga = descargas.find((item) => item.gatewayId._id === gateway._id);
           const clave = String(gateway._id);
+          const pedidosElegibles = pedidos.filter((pedido) =>
+            ['ANTICIPADO', 'A TIEMPO', 'TARDÍO'].includes(pedido.estado) &&
+            pedido.tipoProducto === gateway.tipoCargaPermitida &&
+            !pedido.gatewayId
+          );
+          const pedidoSeleccionadoDisponible = pedidosElegibles.some(
+            (pedido) => pedido._id === pedidoPorGateway[gateway._id]
+          );
           return (
             <article className={`gateway-card ${claseEstado[gateway.estado]}`} key={gateway._id}>
               <div className="gateway-card-head">
@@ -136,6 +181,36 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
                 </div>
               ) : (
                 <div className="gateway-assignment gateway-empty">Sin pedido asignado</div>
+              )}
+
+              {puedeOperar && gateway.estado === 'LIBRE' && pedidosElegibles.length > 0 && (
+                <div className="gateway-queue-entry">
+                  <label className="form-label small mb-1" htmlFor={`pedido-${gateway._id}`}>Pedido elegible</label>
+                  <select
+                    id={`pedido-${gateway._id}`}
+                    className="form-select form-select-sm"
+                    value={pedidoPorGateway[gateway._id] ?? ''}
+                    onChange={(event) => setPedidoPorGateway((actual) => ({ ...actual, [gateway._id]: event.target.value }))}
+                  >
+                    <option value="">Seleccionar pedido</option>
+                    {pedidosElegibles.map((pedido) => (
+                      <option key={pedido._id} value={pedido._id}>
+                        {pedido.numeroPedido} · {pedido.estado}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary w-100 mt-2"
+                    disabled={!pedidoSeleccionadoDisponible || procesando === `cola-${gateway._id}`}
+                    onClick={() => void ejecutar(`cola-${gateway._id}`, async () => {
+                      await encolarPedido(pedidoPorGateway[gateway._id]);
+                      setPedidoPorGateway((actual) => ({ ...actual, [gateway._id]: '' }));
+                    })}
+                  >
+                    {procesando === `cola-${gateway._id}` ? 'Encolando...' : 'Agregar a cola priorizada'}
+                  </button>
+                </div>
               )}
 
               {puedeOperar && gateway.estado === 'LIBRE' && asignado && (
@@ -232,7 +307,7 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
                     <td className="fw-semibold">{pedido.numeroPedido}</td>
                     <td>{pedido.tipoProducto}</td>
                     <td>{pedido.estado}</td>
-                    <td>{pedido.fechaEntradaCola ? `${Math.floor((Date.now() - new Date(pedido.fechaEntradaCola).getTime()) / 60000)} min` : '—'}</td>
+                    <td>{pedido.minutosEnCola === null ? '—' : `${pedido.minutosEnCola} min`}</td>
                   </tr>
                 ))}
               </tbody>

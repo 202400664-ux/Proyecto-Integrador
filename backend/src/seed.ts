@@ -27,6 +27,7 @@ const crearUsuarioSemilla = async () => {
     const rolesPorNombre = new Map(roles.map((role) => [role.nombre, role]));
 
     const parametrosHorario = [
+      { clave: 'numero_equipo', valor: process.env.EQUIPO_NUMERO || '04', descripcion: 'Número del equipo para generar pedidos correlativos' },
       { clave: 'horario_inicio_operativo', valor: '07:00', descripcion: 'Hora de apertura del centro logístico' },
       { clave: 'horario_fin_operativo', valor: '17:00', descripcion: 'Hora de cierre del centro logístico' },
     ];

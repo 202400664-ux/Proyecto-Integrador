@@ -1,9 +1,5 @@
-<<<<<<< HEAD
-import type { DescargaActiva, Gateway, Notificacion, Pedido, Proveedor } from './types';
+import type { Categoria, DescargaActiva, Gateway, Notificacion, Pedido, Proveedor } from './types';
 import { obtenerNombreUsuarioActual } from '../auth';
-=======
-import type { Categoria, Pedido, Proveedor } from './types';
->>>>>>> 0620b3acc8b7c76d991dd1752b7983ef4be39f23
 
 export const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -237,4 +233,21 @@ export async function obtenerNotificaciones(): Promise<Notificacion[]> {
   const response = await fetch(`${API_BASE_URL}/notificaciones`, { headers: headersConSesion() });
   const data = await parseOrThrow<{ notificaciones: Notificacion[] }>(response);
   return data.notificaciones;
+}
+
+export async function encolarPedido(pedidoId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/cola/asignar`, {
+    method: 'POST',
+    headers: headersConSesion(),
+    body: JSON.stringify({ pedidoId }),
+  });
+  await parseOrThrow(response);
+}
+
+export async function reevaluarColaPrioridad(): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/cola/reevaluar`, {
+    method: 'POST',
+    headers: headersConSesion(),
+  });
+  await parseOrThrow(response);
 }
