@@ -132,17 +132,31 @@ export const inactivarGateway = async (req: Request, res: Response): Promise<voi
       res.status(404).json({ mensaje: 'Gateway no encontrado o inactivo' });
       return;
     }
-    if (gateway.estado === 'OCUPADO' || gateway.pedidoAsignadoId) {
+    if (gateway.estado === 'OCUPADO') {
       res.status(400).json({ mensaje: 'Finalice la descarga antes de inactivar el gateway' });
       return;
     }
-    if (gateway.numeroGateway === 5) {
-      res.status(400).json({ mensaje: 'No es posible inactivar el Gateway 5 mientras su regla de exclusividad esté activa' });
+    if (!['LIBRE', 'FUERA DE SERVICIO'].includes(gateway.estado)) {
+      res.status(400).json({ mensaje: 'Solo se puede inactivar un gateway LIBRE o FUERA DE SERVICIO' });
       return;
     }
+    const usuario = req.usuario?.nombreCompleto || 'Sistema';
+    if (gateway.pedidoAsignadoId) {
+      const pedidoDevueltoACola = await Pedido.findOneAndUpdate(
+        { _id: gateway.pedidoAsignadoId, gatewayId: gateway._id, estado: 'GATEWAY_ASIGNADO', activo: true },
+        { $set: { estado: 'EN_COLA', usuarioActualizacion: usuario }, $unset: { gatewayId: 1 } },
+        { returnDocument: 'after' }
+      );
+      if (!pedidoDevueltoACola) {
+        res.status(409).json({ mensaje: 'No se pudo liberar la asignación pendiente del gateway' });
+        return;
+      }
+      gateway.pedidoAsignadoId = undefined;
+    }
     gateway.activo = false;
-    gateway.usuarioActualizacion = req.usuario?.nombreCompleto || 'Sistema';
+    gateway.usuarioActualizacion = usuario;
     await gateway.save();
+    await reevaluarCola();
     await registrarAuditoria({ entidad: 'Gateway', accion: 'inactivar', detalle: `Se inactivó el Gateway ${gateway.numeroGateway}`, usuario: gateway.usuarioActualizacion });
     res.status(200).json({ mensaje: 'Gateway inactivado lógicamente', gateway });
   } catch (error) {

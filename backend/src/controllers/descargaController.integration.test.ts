@@ -5,6 +5,7 @@ import { iniciarDescarga, finalizarDescarga } from './descargaController.js';
 import { Descarga } from '../models/Descarga.js';
 import { Gateway } from '../models/Gateway.js';
 import { Pedido } from '../models/Pedido.js';
+import { inactivarGateway } from './gatewayController.js';
 
 const mongoTestUri = process.env.MONGO_TEST_URI;
 
@@ -54,7 +55,7 @@ test('iniciar y finalizar descarga mantiene pedido y gateway consistentes', { sk
 
     const finalizarResponse = respuestaFalsa();
     await finalizarDescarga(
-      { body: { descargaId: String(descarga._id) }, usuario } as never,
+      { body: { descargasId: String(descarga._id) }, usuario } as never,
       finalizarResponse as never
     );
     assert.equal(finalizarResponse.statusCode, 200, JSON.stringify(finalizarResponse.body));
@@ -67,6 +68,70 @@ test('iniciar y finalizar descarga mantiene pedido y gateway consistentes', { sk
     assert.equal(gatewayFinal?.pedidoAsignadoId, undefined);
     assert.ok(descargaFinal?.fechaHoraFin);
     assert.ok(descargaFinal?.duracionMinutos !== undefined);
+
+    const gatewayConstruccion = await Gateway.create({
+      numeroGateway: 5,
+      tipoCargaPermitida: 'construcción',
+      estado: 'FUERA DE SERVICIO',
+      activo: true,
+      usuarioCreacion: 'Prueba',
+      usuarioActualizacion: 'Prueba',
+    });
+    const inactivarResponse = respuestaFalsa();
+    await inactivarGateway(
+      { params: { id: String(gatewayConstruccion._id) }, usuario } as never,
+      inactivarResponse as never
+    );
+    assert.equal(inactivarResponse.statusCode, 200, JSON.stringify(inactivarResponse.body));
+    assert.equal((await Gateway.findById(gatewayConstruccion._id))?.activo, false);
+
+    const gatewayLibreAsignado = await Gateway.create({
+      numeroGateway: 3,
+      tipoCargaPermitida: 'general',
+      estado: 'LIBRE',
+      activo: true,
+      usuarioCreacion: 'Prueba',
+      usuarioActualizacion: 'Prueba',
+    });
+    const pedidoEnGateway = await Pedido.create({
+      numeroPedido: 'PED-EQUI04-000000002',
+      proveedorId: new mongoose.Types.ObjectId(),
+      tipoProducto: 'general',
+      fechaHoraProgramada: new Date(),
+      inicioVentana: new Date(),
+      finVentana: new Date(Date.now() + 60_000),
+      duracionEstimadaMinutos: 1,
+      estado: 'GATEWAY_ASIGNADO',
+      gatewayId: gatewayLibreAsignado._id,
+      activo: true,
+      usuarioCreacion: 'Prueba',
+      usuarioActualizacion: 'Prueba',
+    });
+    await Gateway.updateOne({ _id: gatewayLibreAsignado._id }, { $set: { pedidoAsignadoId: pedidoEnGateway._id } });
+    const inactivarAsignadoResponse = respuestaFalsa();
+    await inactivarGateway(
+      { params: { id: String(gatewayLibreAsignado._id) }, usuario } as never,
+      inactivarAsignadoResponse as never
+    );
+    assert.equal(inactivarAsignadoResponse.statusCode, 200, JSON.stringify(inactivarAsignadoResponse.body));
+    const pedidoDevueltoACola = await Pedido.findById(pedidoEnGateway._id);
+    assert.ok(['EN_COLA', 'GATEWAY_ASIGNADO'].includes(pedidoDevueltoACola?.estado ?? ''));
+    assert.notEqual(String(pedidoDevueltoACola?.gatewayId), String(gatewayLibreAsignado._id));
+
+    const gatewayOcupado = await Gateway.create({
+      numeroGateway: 2,
+      tipoCargaPermitida: 'general',
+      estado: 'OCUPADO',
+      activo: true,
+      usuarioCreacion: 'Prueba',
+      usuarioActualizacion: 'Prueba',
+    });
+    const rechazarInactivacionResponse = respuestaFalsa();
+    await inactivarGateway(
+      { params: { id: String(gatewayOcupado._id) }, usuario } as never,
+      rechazarInactivacionResponse as never
+    );
+    assert.equal(rechazarInactivacionResponse.statusCode, 400);
   } finally {
     await mongoose.connection.dropDatabase();
     await mongoose.disconnect();

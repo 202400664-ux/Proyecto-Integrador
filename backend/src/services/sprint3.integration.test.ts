@@ -5,6 +5,7 @@ import { generarNumeroPedido } from '../controllers/pedidoController.js';
 import { Gateway } from '../models/Gateway.js';
 import { Pedido } from '../models/Pedido.js';
 import { Parametro } from '../models/Parametro.js';
+import { ContadorPedido } from '../models/ContadorPedido.js';
 import { reevaluarCola } from './colaPrioridad.js';
 
 const mongoTestUri = process.env.MONGO_TEST_URI;
@@ -25,8 +26,9 @@ test('correlativo evita colisiones y cola respeta compatibilidad y prioridad', {
     const codigo = (correlativo: number) => `PED-EQUI${String(equipo).padStart(2, '0')}-${String(correlativo).padStart(9, '0')}`;
 
     await crearPedido(codigo(1), 'general', 'PROGRAMADO');
-    assert.equal(await generarNumeroPedido(), codigo(2));
-    assert.equal(await generarNumeroPedido(), codigo(3));
+    await ContadorPedido.deleteMany({ equipo });
+    const correlativos = await Promise.all([generarNumeroPedido(), generarNumeroPedido()]);
+    assert.deepEqual(correlativos.sort(), [codigo(2), codigo(3)]);
 
     const gatewayGeneral = await Gateway.create({ numeroGateway: 1, tipoCargaPermitida: 'general', estado: 'LIBRE', activo: true });
     const gatewayConstruccion = await Gateway.create({ numeroGateway: 5, tipoCargaPermitida: 'construcción', estado: 'LIBRE', activo: true });

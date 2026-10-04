@@ -16,6 +16,10 @@ interface HorarioOperativo {
 const HORARIO_POR_DEFECTO: HorarioOperativo = { inicio: 7 * 60, fin: 17 * 60 };
 const CLAVES_HORARIO = ['horario_inicio_operativo', 'horario_fin_operativo'] as const;
 
+function esErrorClaveDuplicada(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
+}
+
 function minutosDesdeMedianoche(valor: string | undefined, porDefecto: number): number {
   if (!valor) return porDefecto;
   const texto = valor.trim();
@@ -68,11 +72,15 @@ export async function generarNumeroPedido(): Promise<string> {
     .select('numeroPedido');
   const ultimoCorrelativo = ultimoPedido ? Number(ultimoPedido.numeroPedido.slice(prefijo.length)) : 0;
 
-  await ContadorPedido.updateOne(
-    { equipo },
-    { $max: { ultimo: ultimoCorrelativo }, $setOnInsert: { equipo } },
-    { upsert: true }
-  );
+  try {
+    await ContadorPedido.updateOne(
+      { equipo },
+      { $max: { ultimo: ultimoCorrelativo }, $setOnInsert: { equipo } },
+      { upsert: true }
+    );
+  } catch (error) {
+    if (!esErrorClaveDuplicada(error)) throw error;
+  }
 
   for (let intento = 0; intento < 100; intento += 1) {
     const contador = await ContadorPedido.findOneAndUpdate(

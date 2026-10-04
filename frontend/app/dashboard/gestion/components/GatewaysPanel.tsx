@@ -246,20 +246,18 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
                   >
                     {gateway.estado === 'LIBRE' ? 'Sacar de servicio' : 'Habilitar'}
                   </button>
-                  {gateway.numeroGateway !== 5 && (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-danger"
-                      disabled={procesando === clave}
-                      onClick={() => {
-                        if (window.confirm(`¿Inactivar Gateway ${gateway.numeroGateway}? Se conservará en la base de datos.`)) {
-                          void ejecutar(clave, () => inactivarGateway(gateway._id));
-                        }
-                      }}
-                    >
-                      Inactivar
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger"
+                    disabled={procesando === clave}
+                    onClick={() => {
+                      if (window.confirm(`¿Inactivar Gateway ${gateway.numeroGateway}? Se conservará en la base de datos.`)) {
+                        void ejecutar(clave, () => inactivarGateway(gateway._id));
+                      }
+                    }}
+                  >
+                    Inactivar
+                  </button>
                 </div>
               )}
             </article>

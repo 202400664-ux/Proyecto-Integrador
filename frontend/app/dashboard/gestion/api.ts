@@ -208,7 +208,7 @@ export async function iniciarDescarga(pedidoId: string, gatewayId: string): Prom
 
 export async function finalizarDescarga(descargaId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/descargas/finalizar`, {
-    method: 'POST', headers: headersConSesion(), body: JSON.stringify({ descargaId }),
+    method: 'POST', headers: headersConSesion(), body: JSON.stringify({ descargasId: descargaId }),
   });
   await parseOrThrow(response);
 }

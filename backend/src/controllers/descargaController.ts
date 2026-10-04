@@ -62,7 +62,8 @@ async function iniciarDescargaCompensable(req: Request): Promise<string> {
 
 async function finalizarDescargaCompensable(req: Request): Promise<string> {
   const usuario = req.usuario?.nombreCompleto || 'Sistema';
-  const descarga = await Descarga.findOne({ _id: req.body.descargaId, activo: true, fechaHoraFin: { $exists: false } });
+  const descargaId = req.body.descargasId ?? req.body.descargaId;
+  const descarga = await Descarga.findOne({ _id: descargaId, activo: true, fechaHoraFin: { $exists: false } });
   if (!descarga) throw new Error('Descarga activa no encontrada');
   const [gateway, pedido] = await Promise.all([
     Gateway.findById(descarga.gatewayId),
@@ -185,7 +186,8 @@ export const finalizarDescarga = async (req: Request, res: Response): Promise<vo
   try {
     try {
       await session.withTransaction(async () => {
-      const descarga = await Descarga.findOne({ _id: req.body.descargaId, activo: true, fechaHoraFin: { $exists: false } }).session(session);
+      const descargaIdSolicitada = req.body.descargasId ?? req.body.descargaId;
+      const descarga = await Descarga.findOne({ _id: descargaIdSolicitada, activo: true, fechaHoraFin: { $exists: false } }).session(session);
       if (!descarga) throw new Error('Descarga activa no encontrada');
       const [gateway, pedido] = await Promise.all([
         Gateway.findById(descarga.gatewayId).session(session),
