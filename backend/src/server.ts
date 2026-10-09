@@ -15,6 +15,8 @@ import descargasRoutes from './routes/descargas.js';
 import { inicializarGateways } from './controllers/gatewayController.js';
 import { autenticar, requiereRol } from './middleware/autenticacion.js';
 import notificacionesRoutes from './routes/notificaciones.js';
+import eventosRoutes from './routes/eventos.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 dotenv.config();
 
@@ -46,6 +48,8 @@ app.use('/api/gateways', gatewaysRoutes);
 app.use('/api/cola', colaRoutes);
 app.use('/api/descargas', descargasRoutes);
 app.use('/api/notificaciones', notificacionesRoutes);
+app.use('/api/eventos', eventosRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor backend corriendo en el puerto ${PORT}`);

@@ -11,16 +11,29 @@ export const obtenerCola = async (_req: Request, res: Response): Promise<void> =
 
 export const asignarDesdeCola = async (req: Request, res: Response): Promise<void> => {
   try {
-    const pedido = await encolarPedido(String(req.body.pedidoId || ''));
+    const actor = req.usuario;
+    if (!actor) {
+      res.status(401).json({ mensaje: 'Se requiere una sesión autenticada' });
+      return;
+    }
+    const pedido = await encolarPedido(String(req.body.pedidoId || ''), {
+      id: actor.id,
+      nombreCompleto: actor.nombreCompleto,
+    });
     res.status(200).json({ mensaje: 'Pedido procesado por la cola de prioridad', pedido });
   } catch (error) {
     res.status(400).json({ mensaje: error instanceof Error ? error.message : 'No se pudo asignar el pedido' });
   }
 };
 
-export const reevaluarColaController = async (_req: Request, res: Response): Promise<void> => {
+export const reevaluarColaController = async (req: Request, res: Response): Promise<void> => {
   try {
-    await reevaluarCola();
+    const actor = req.usuario;
+    if (!actor) {
+      res.status(401).json({ mensaje: 'Se requiere una sesión autenticada' });
+      return;
+    }
+    await reevaluarCola({ id: actor.id, nombreCompleto: actor.nombreCompleto });
     res.status(200).json({ mensaje: 'Cola reevaluada', pedidos: await listarColaPrioridad() });
   } catch (error) {
     res.status(500).json({ mensaje: 'No se pudo reevaluar la cola', error });

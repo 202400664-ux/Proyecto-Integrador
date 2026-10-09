@@ -22,7 +22,8 @@ export type Permiso =
   | 'auditoria.ver'
   | 'gateways.ver'
   | 'gateways.admin'
-  | 'descargas.operar';
+  | 'descargas.operar'
+  | 'dashboard.kpis';
 
 const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   administrador: [
@@ -43,6 +44,7 @@ const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
     'gateways.ver',
     'gateways.admin',
     'descargas.operar',
+    'dashboard.kpis',
   ],
   coordinador: [
     'proveedores.ver',
@@ -59,6 +61,7 @@ const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
     'auditoria.ver',
     'gateways.ver',
     'descargas.operar',
+    'dashboard.kpis',
   ],
   operador: [
     'proveedores.ver',

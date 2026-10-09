@@ -7,6 +7,7 @@ import { Parametro } from '../models/Parametro.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { marcarPedidosAusentes } from './llegadasController.js';
 import { ContadorPedido } from '../models/ContadorPedido.js';
+import { registrarEvento } from '../services/eventos.js';
 
 interface HorarioOperativo {
   inicio: number;
@@ -386,6 +387,15 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    const inicioAnterior = new Date(pedido.inicioVentana);
+    const finAnterior = new Date(pedido.finVentana);
+    const citaReprogramada = inicio.getTime() !== inicioAnterior.getTime() || fin.getTime() !== finAnterior.getTime();
+    const proveedorAnterior = pedido.proveedorId;
+    const tipoProductoAnterior = pedido.tipoProducto;
+    const fechaProgramadaAnterior = new Date(pedido.fechaHoraProgramada);
+    const duracionAnterior = pedido.duracionEstimadaMinutos;
+    const usuarioActualizacionAnterior = pedido.usuarioActualizacion;
+
     pedido.proveedorId = proveedor._id;
     pedido.tipoProducto = tipoProducto;
     pedido.inicioVentana = inicio;
@@ -394,6 +404,38 @@ export const actualizarPedido = async (req: Request, res: Response): Promise<voi
     pedido.fechaHoraProgramada = pedido.inicioVentana;
     pedido.usuarioActualizacion = req.usuarioAutenticado!.nombreCompleto;
     await pedido.save();
+
+    if (citaReprogramada) {
+      try {
+        await registrarEvento({
+          usuarioId: req.usuarioAutenticado!.id,
+          usuario: req.usuarioAutenticado!.nombreCompleto,
+          accion: 'CITA_REPROGRAMADA',
+          pedidoId: String(pedido._id),
+          detalles: {
+            numeroPedido: pedido.numeroPedido,
+            inicioAnterior: inicioAnterior.toISOString(),
+            finAnterior: finAnterior.toISOString(),
+            inicioNuevo: inicio.toISOString(),
+            finNuevo: fin.toISOString(),
+          },
+        });
+      } catch (error) {
+        pedido.proveedorId = proveedorAnterior;
+        pedido.tipoProducto = tipoProductoAnterior;
+        pedido.inicioVentana = inicioAnterior;
+        pedido.finVentana = finAnterior;
+        pedido.duracionEstimadaMinutos = duracionAnterior;
+        pedido.fechaHoraProgramada = fechaProgramadaAnterior;
+        pedido.usuarioActualizacion = usuarioActualizacionAnterior;
+        try {
+          await pedido.save();
+        } catch (rollbackError) {
+          throw new AggregateError([error, rollbackError], 'No se pudo guardar el evento ni revertir la reprogramación');
+        }
+        throw error;
+      }
+    }
 
     await registrarAuditoria({
       entidad: 'Pedido',

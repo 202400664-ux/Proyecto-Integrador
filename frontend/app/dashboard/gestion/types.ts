@@ -77,3 +77,27 @@ export interface Notificacion {
   leida: boolean;
   fechaCreacion: string;
 }
+
+export interface DashboardKpis {
+  periodoOcupacionDias: number;
+  tiempoPromedioEsperaMinutos: number;
+  tiempoPromedioDescargaMinutos: {
+    general: number;
+    construccion: number;
+  };
+  nivelCumplimiento: Record<
+    'A TIEMPO' | 'ANTICIPADO' | 'TARDÍO' | 'AUSENTE',
+    { cantidad: number; porcentaje: number }
+  >;
+  ocupacionPorGateway: Array<{
+    numeroGateway: number;
+    porcentaje: number;
+    minutosOcupados: number;
+    minutosOperativos: number;
+  }>;
+  volumenDiario: Array<{
+    fecha: string;
+    atendidos: number;
+    finalizados: number;
+  }>;
+}

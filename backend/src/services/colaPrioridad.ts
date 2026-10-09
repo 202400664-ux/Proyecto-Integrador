@@ -3,6 +3,12 @@ import { Gateway } from '../models/Gateway.js';
 import { Pedido, type EstadoPedido, type TipoProducto } from '../models/Pedido.js';
 import { registrarAuditoria } from '../controllers/auditoriaController.js';
 import { notificarRol } from './notificaciones.js';
+import { registrarEvento } from './eventos.js';
+
+export interface ActorOperativo {
+  id: string;
+  nombreCompleto: string;
+}
 
 interface PedidoEnCola {
   _id: Types.ObjectId;
@@ -73,7 +79,7 @@ export class MaxHeapPedidos {
   }
 }
 
-export async function reevaluarCola(): Promise<void> {
+export async function reevaluarCola(actor: ActorOperativo): Promise<void> {
   const pedidos = await Pedido.find({ activo: true, estado: 'EN_COLA' })
     .sort({ fechaEntradaCola: 1 })
     .lean<PedidoEnCola[]>();
@@ -111,6 +117,26 @@ export async function reevaluarCola(): Promise<void> {
       continue;
     }
 
+    try {
+      await registrarEvento({
+        usuarioId: actor.id,
+        usuario: actor.nombreCompleto,
+        accion: 'GATEWAY_ASIGNADO',
+        pedidoId: String(asignado._id),
+        detalles: { numeroPedido: asignado.numeroPedido, numeroGateway: gateway.numeroGateway },
+      });
+    } catch (error) {
+      await Pedido.updateOne(
+        { _id: asignado._id, estado: 'GATEWAY_ASIGNADO', gatewayId: gateway._id },
+        { $set: { estado: 'EN_COLA', usuarioActualizacion: actor.nombreCompleto }, $unset: { gatewayId: 1 } }
+      );
+      await Gateway.updateOne(
+        { _id: gateway._id, pedidoAsignadoId: asignado._id },
+        { $unset: { pedidoAsignadoId: 1 } }
+      );
+      throw error;
+    }
+
     const indice = pedidos.findIndex((pedido) => String(pedido._id) === String(candidato._id));
     if (indice >= 0) pedidos.splice(indice, 1);
     await registrarAuditoria({
@@ -129,7 +155,7 @@ export async function reevaluarCola(): Promise<void> {
   }
 }
 
-export async function encolarPedido(pedidoId: string): Promise<unknown> {
+export async function encolarPedido(pedidoId: string, actor: ActorOperativo): Promise<unknown> {
   const pedido = await Pedido.findOne({ _id: pedidoId, activo: true });
   if (!pedido) throw new Error('Pedido no encontrado o inactivo');
   if (!['ANTICIPADO', 'A TIEMPO', 'TARDÍO'].includes(pedido.estado)) {
@@ -141,8 +167,8 @@ export async function encolarPedido(pedidoId: string): Promise<unknown> {
   pedido.fechaEntradaCola = new Date();
   pedido.gatewayId = undefined;
   await pedido.save();
-  await registrarAuditoria({ entidad: 'Cola', accion: 'ingresar', detalle: `Pedido ${pedido.numeroPedido} ingresó a la cola`, usuario: 'Motor EDA 0' });
-  await reevaluarCola();
+  await registrarAuditoria({ entidad: 'Cola', accion: 'ingresar', detalle: `Pedido ${pedido.numeroPedido} ingresó a la cola`, usuario: actor.nombreCompleto });
+  await reevaluarCola(actor);
   return Pedido.findById(pedido._id).populate('gatewayId');
 }
 

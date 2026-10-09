@@ -36,7 +36,7 @@ test('correlativo evita colisiones y cola respeta compatibilidad y prioridad', {
     const aTiempo = await crearPedido(codigo(5), 'general', 'EN_COLA', 0);
     const construccion = await crearPedido(codigo(6), 'construcción', 'EN_COLA', 0);
 
-    await reevaluarCola();
+    await reevaluarCola({ id: String(new mongoose.Types.ObjectId()), nombreCompleto: 'Coordinador de prueba' });
 
     const pedidosActualizados = await Pedido.find({ _id: { $in: [tardio._id, aTiempo._id, construccion._id] } });
     const pedidoTardio = pedidosActualizados.find((pedido) => String(pedido._id) === String(tardio._id));

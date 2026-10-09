@@ -1,4 +1,4 @@
-import type { Categoria, DescargaActiva, Gateway, Notificacion, Pedido, Proveedor } from './types';
+import type { Categoria, DashboardKpis, DescargaActiva, Gateway, Notificacion, Pedido, Proveedor } from './types';
 import { obtenerNombreUsuarioActual } from '../auth';
 
 export const API_BASE_URL = 'http://localhost:4000/api';
@@ -172,6 +172,11 @@ export async function registrarArribo(numeroPedido: string) {
 function headersConSesion(): HeadersInit {
   const token = localStorage.getItem('token');
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+export async function obtenerDashboardKpis(): Promise<DashboardKpis> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/kpis`, { headers: headersConSesion() });
+  return parseOrThrow<DashboardKpis>(response);
 }
 
 export async function obtenerGateways(): Promise<Gateway[]> {

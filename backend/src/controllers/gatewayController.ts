@@ -4,6 +4,7 @@ import { Pedido } from '../models/Pedido.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { reevaluarCola } from '../services/colaPrioridad.js';
 import { notificarRol } from '../services/notificaciones.js';
+import { registrarEvento } from '../services/eventos.js';
 
 const tipoPermitido = (numeroGateway: number): TipoCargaGateway =>
   numeroGateway === 5 ? 'construcción' : 'general';
@@ -107,10 +108,40 @@ export const actualizarGateway = async (req: Request, res: Response): Promise<vo
       res.status(400).json({ mensaje: 'El estado solo puede cambiarse a LIBRE o FUERA DE SERVICIO desde administración' });
       return;
     }
+    const estadoAnterior = gateway.estado;
+    const usuarioAnterior = gateway.usuarioActualizacion;
     if (req.body.estado) gateway.estado = req.body.estado;
-    gateway.usuarioActualizacion = req.usuario?.nombreCompleto || 'Sistema';
+    const actor = req.usuario;
+    if (!actor) {
+      res.status(401).json({ mensaje: 'Se requiere una sesión autenticada' });
+      return;
+    }
+    gateway.usuarioActualizacion = actor.nombreCompleto;
     await gateway.save();
-    if (gateway.estado === 'LIBRE') await reevaluarCola();
+    if (gateway.estado !== estadoAnterior) {
+      try {
+        await registrarEvento({
+          usuarioId: actor.id,
+          usuario: actor.nombreCompleto,
+          accion: 'GATEWAY_MANTENIMIENTO',
+          detalles: {
+            numeroGateway: gateway.numeroGateway,
+            estadoAnterior,
+            estadoNuevo: gateway.estado,
+          },
+        });
+      } catch (error) {
+        gateway.estado = estadoAnterior;
+        gateway.usuarioActualizacion = usuarioAnterior;
+        try {
+          await gateway.save();
+        } catch (rollbackError) {
+          throw new AggregateError([error, rollbackError], 'No se pudo guardar el evento ni revertir el estado del gateway');
+        }
+        throw error;
+      }
+    }
+    if (gateway.estado === 'LIBRE') await reevaluarCola({ id: actor.id, nombreCompleto: actor.nombreCompleto });
     await registrarAuditoria({ entidad: 'Gateway', accion: 'actualizar', detalle: `Se actualizó el Gateway ${gateway.numeroGateway}: ${gateway.estado}`, usuario: gateway.usuarioActualizacion });
     await notificarRol(
       'coordinador',
@@ -140,7 +171,12 @@ export const inactivarGateway = async (req: Request, res: Response): Promise<voi
       res.status(400).json({ mensaje: 'Solo se puede inactivar un gateway LIBRE o FUERA DE SERVICIO' });
       return;
     }
-    const usuario = req.usuario?.nombreCompleto || 'Sistema';
+    const actor = req.usuario;
+    if (!actor) {
+      res.status(401).json({ mensaje: 'Se requiere una sesión autenticada' });
+      return;
+    }
+    const usuario = actor.nombreCompleto;
     if (gateway.pedidoAsignadoId) {
       const pedidoDevueltoACola = await Pedido.findOneAndUpdate(
         { _id: gateway.pedidoAsignadoId, gatewayId: gateway._id, estado: 'GATEWAY_ASIGNADO', activo: true },
@@ -156,7 +192,7 @@ export const inactivarGateway = async (req: Request, res: Response): Promise<voi
     gateway.activo = false;
     gateway.usuarioActualizacion = usuario;
     await gateway.save();
-    await reevaluarCola();
+    await reevaluarCola({ id: actor.id, nombreCompleto: actor.nombreCompleto });
     await registrarAuditoria({ entidad: 'Gateway', accion: 'inactivar', detalle: `Se inactivó el Gateway ${gateway.numeroGateway}`, usuario: gateway.usuarioActualizacion });
     res.status(200).json({ mensaje: 'Gateway inactivado lógicamente', gateway });
   } catch (error) {
@@ -180,13 +216,45 @@ export const reactivarGateway = async (req: Request, res: Response): Promise<voi
       res.status(404).json({ mensaje: 'Gateway inactivo no encontrado' });
       return;
     }
+    const estadoAnterior = gateway.estado;
+    const usuarioAnterior = gateway.usuarioActualizacion;
+    const actor = req.usuario;
+    if (!actor) {
+      res.status(401).json({ mensaje: 'Se requiere una sesión autenticada' });
+      return;
+    }
     gateway.activo = true;
     gateway.estado = 'LIBRE';
     gateway.pedidoAsignadoId = undefined;
-    gateway.usuarioActualizacion = req.usuario?.nombreCompleto || 'Sistema';
+    gateway.usuarioActualizacion = actor.nombreCompleto;
     await gateway.save();
+    if (estadoAnterior !== gateway.estado) {
+      try {
+        await registrarEvento({
+          usuarioId: actor.id,
+          usuario: actor.nombreCompleto,
+          accion: 'GATEWAY_MANTENIMIENTO',
+          detalles: {
+            numeroGateway: gateway.numeroGateway,
+            estadoAnterior,
+            estadoNuevo: gateway.estado,
+            gatewayReactivado: true,
+          },
+        });
+      } catch (error) {
+        gateway.activo = false;
+        gateway.estado = estadoAnterior;
+        gateway.usuarioActualizacion = usuarioAnterior;
+        try {
+          await gateway.save();
+        } catch (rollbackError) {
+          throw new AggregateError([error, rollbackError], 'No se pudo guardar el evento ni revertir la reactivación del gateway');
+        }
+        throw error;
+      }
+    }
     await registrarAuditoria({ entidad: 'Gateway', accion: 'reactivar', detalle: `Se reactivó el Gateway ${gateway.numeroGateway}`, usuario: gateway.usuarioActualizacion });
-    await reevaluarCola();
+    await reevaluarCola({ id: actor.id, nombreCompleto: actor.nombreCompleto });
     res.status(200).json({ mensaje: 'Gateway reactivado', gateway });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al reactivar gateway', error });

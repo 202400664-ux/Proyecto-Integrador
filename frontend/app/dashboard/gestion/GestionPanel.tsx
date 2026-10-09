@@ -13,8 +13,9 @@ import MantenimientosPanel from './components/MantenimientosPanel';
 import AuditoriaPanel from './components/AuditoriaPanel';
 import ParametrosPanel from './components/ParametrosPanel';
 import GatewaysPanel from './components/GatewaysPanel';
+import DashboardKpis from './components/DashboardKpis';
 
-type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'gateways' | 'mantenimientos' | 'auditoria' | 'parametros';
+type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'gateways' | 'mantenimientos' | 'auditoria' | 'kpis' | 'parametros';
 
 /**
  * Panel único de Proveedores/Pedidos/Caseta para TODOS los roles.
@@ -104,7 +105,7 @@ export default function GestionPanel() {
     const onShowHome = () => setPestana('inicio');
     const onSelectTab = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
-      if (detail && ['inicio', 'proveedores', 'pedidos', 'caseta', 'gateways', 'parametros', 'mantenimientos', 'auditoria'].includes(detail)) {
+      if (detail && ['inicio', 'proveedores', 'pedidos', 'caseta', 'gateways', 'parametros', 'mantenimientos', 'auditoria', 'kpis'].includes(detail)) {
         setPestana(detail as Pestana);
       }
     };
@@ -289,6 +290,8 @@ export default function GestionPanel() {
       {pestana === 'mantenimientos' && <MantenimientosPanel />}
 
       {pestana === 'auditoria' && puede('auditoria.ver') && <AuditoriaPanel />}
+
+      {pestana === 'kpis' && puede('dashboard.kpis') && <DashboardKpis />}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { iniciarDescarga, finalizarDescarga } from './descargaController.js';
 import { Descarga } from '../models/Descarga.js';
 import { Gateway } from '../models/Gateway.js';
 import { Pedido } from '../models/Pedido.js';
+import { Evento } from '../models/Evento.js';
 import { inactivarGateway } from './gatewayController.js';
 
 const mongoTestUri = process.env.MONGO_TEST_URI;
@@ -52,22 +53,34 @@ test('iniciar y finalizar descarga mantiene pedido y gateway consistentes', { sk
 
     const descarga = await Descarga.findOne({ pedidoId: pedido._id, fechaHoraFin: { $exists: false } });
     assert.ok(descarga, 'debe persistirse la descarga activa');
+    const eventoInicio = await Evento.findOne({ pedidoId: pedido._id, accion: 'DESCARGADA_INICIADA' });
+    assert.equal(String(eventoInicio?.usuarioId), String(operadorId));
 
     const finalizarResponse = respuestaFalsa();
     await finalizarDescarga(
       { body: { descargasId: String(descarga._id) }, usuario } as never,
       finalizarResponse as never
     );
-    assert.equal(finalizarResponse.statusCode, 200, JSON.stringify(finalizarResponse.body));
+    if (finalizarResponse.statusCode === 503) {
+      const descargaSinCambios = await Descarga.findById(descarga._id);
+      assert.equal(descargaSinCambios?.fechaHoraFin, undefined);
+      assert.equal((await Pedido.findById(pedido._id))?.estado, 'DESCARGANDO');
+      assert.equal((await Gateway.findById(gateway._id))?.estado, 'OCUPADO');
+      assert.equal(await Evento.countDocuments({ pedidoId: pedido._id, accion: 'DESCARGA_FINALIZADA' }), 0);
+    } else {
+      assert.equal(finalizarResponse.statusCode, 200, JSON.stringify(finalizarResponse.body));
 
-    const pedidoFinal = await Pedido.findById(pedido._id);
-    const gatewayFinal = await Gateway.findById(gateway._id);
-    const descargaFinal = await Descarga.findById(descarga._id);
-    assert.equal(pedidoFinal?.estado, 'FINALIZADO');
-    assert.equal(gatewayFinal?.estado, 'LIBRE');
-    assert.equal(gatewayFinal?.pedidoAsignadoId, undefined);
-    assert.ok(descargaFinal?.fechaHoraFin);
-    assert.ok(descargaFinal?.duracionMinutos !== undefined);
+      const pedidoFinal = await Pedido.findById(pedido._id);
+      const gatewayFinal = await Gateway.findById(gateway._id);
+      const descargaFinal = await Descarga.findById(descarga._id);
+      assert.equal(pedidoFinal?.estado, 'FINALIZADO');
+      assert.equal(gatewayFinal?.estado, 'LIBRE');
+      assert.equal(gatewayFinal?.pedidoAsignadoId, undefined);
+      assert.ok(descargaFinal?.fechaHoraFin);
+      assert.ok(descargaFinal?.duracionMinutos !== undefined);
+      const eventoFin = await Evento.findOne({ pedidoId: pedido._id, accion: 'DESCARGA_FINALIZADA' });
+      assert.equal(String(eventoFin?.usuarioId), String(operadorId));
+    }
 
     const gatewayConstruccion = await Gateway.create({
       numeroGateway: 5,

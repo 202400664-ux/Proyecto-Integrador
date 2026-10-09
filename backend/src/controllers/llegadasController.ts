@@ -3,6 +3,7 @@ import { Pedido } from '../models/Pedido.js';
 import { Parametro } from '../models/Parametro.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { encolarPedido } from '../services/colaPrioridad.js';
+import { registrarEvento } from '../services/eventos.js';
 
 /** Lee un parámetro numérico de tolerancia; si no existe, usa el valor por defecto. */
 async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Promise<number> {
@@ -15,7 +16,12 @@ async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Prom
 export const registrarLlegada = async (req: Request, res: Response): Promise<void> => {
   try {
     const { numeroPedido } = req.body;
-    const actor = req.usuario?.nombreCompleto || 'Operador Caseta';
+    const autenticado = req.usuarioAutenticado;
+    if (!autenticado) {
+      res.status(401).json({ mensaje: 'Se requiere una sesión autenticada' });
+      return;
+    }
+    const actor = autenticado.nombreCompleto;
 
     const pedido = await Pedido.findOne({ numeroPedido, activo: { $ne: false }, estado: { $ne: 'CANCELADO' } });
     if (!pedido) {
@@ -30,6 +36,9 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    const estadoAnterior = pedido.estado;
+    const clasificacionAnterior = pedido.clasificacionPuntualidad;
+    const usuarioActualizacionAnterior = pedido.usuarioActualizacion;
     const fechaLlegadaReal = new Date();
     pedido.fechaHoraLlegadaReal = fechaLlegadaReal;
 
@@ -54,6 +63,31 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
     pedido.usuarioActualizacion = actor;
     await pedido.save();
 
+    try {
+      await registrarEvento({
+        usuarioId: autenticado.id,
+        usuario: actor,
+        accion: 'LLEGADA_REGISTRADA',
+        pedidoId: String(pedido._id),
+        detalles: {
+          numeroPedido: pedido.numeroPedido,
+          fechaHoraLlegadaReal: fechaLlegadaReal.toISOString(),
+          clasificacionPuntualidad: nuevoEstado,
+        },
+      });
+    } catch (error) {
+      pedido.fechaHoraLlegadaReal = undefined;
+      pedido.estado = estadoAnterior;
+      pedido.clasificacionPuntualidad = clasificacionAnterior;
+      pedido.usuarioActualizacion = usuarioActualizacionAnterior;
+      try {
+        await pedido.save();
+      } catch (rollbackError) {
+        throw new AggregateError([error, rollbackError], 'No se pudo guardar el evento ni revertir el arribo');
+      }
+      throw error;
+    }
+
     await registrarAuditoria({
       entidad: 'Llegada',
       accion: 'registrar',
@@ -61,10 +95,12 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
       usuario: actor,
     });
 
+    let advertenciaCola: string | undefined;
     try {
-      await encolarPedido(String(pedido._id));
+      await encolarPedido(String(pedido._id), { id: autenticado.id, nombreCompleto: actor });
     } catch (error) {
       console.error('No se pudo procesar el pedido en la cola de gateways:', error);
+      advertenciaCola = 'El arribo quedó registrado, pero no se pudo procesar la asignación automática en la cola.';
     }
     const pedidoActualizado = await Pedido.findById(pedido._id).populate('gatewayId');
 
@@ -72,6 +108,7 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
       mensaje: 'Arribo registrado con éxito',
       estadoCalculado: nuevoEstado,
       pedido: pedidoActualizado,
+      ...(advertenciaCola ? { advertencia: advertenciaCola } : {}),
     });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al registrar el arribo', error });

@@ -5,6 +5,7 @@ import { Gateway } from '../models/Gateway.js';
 import { Pedido } from '../models/Pedido.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { reevaluarCola } from '../services/colaPrioridad.js';
+import { registrarEvento } from '../services/eventos.js';
 
 function transaccionesNoDisponibles(error: unknown): boolean {
   return error instanceof Error && /Transaction numbers are only allowed|transactions are not supported/i.test(error.message);
@@ -50,62 +51,19 @@ async function iniciarDescargaCompensable(req: Request): Promise<string> {
       usuarioActualizacion: usuario,
     });
     descargaId = String(descarga._id);
+    await registrarEvento({
+      usuarioId: String(req.usuario?.id),
+      usuario,
+      accion: 'DESCARGADA_INICIADA',
+      pedidoId: String(pedido._id),
+      detalles: { numeroPedido: pedido.numeroPedido, numeroGateway: gateway.numeroGateway },
+    });
     await registrarAuditoria({ entidad: 'Descarga', accion: 'iniciar', detalle: `Inició descarga ${pedido.numeroPedido} en Gateway ${gateway.numeroGateway}`, usuario });
     return descargaId;
   } catch (error) {
     if (descargaId) await Descarga.updateOne({ _id: descargaId }, { $set: { activo: false, usuarioActualizacion: usuario } });
     await Pedido.updateOne({ _id: pedido._id, estado: 'DESCARGANDO' }, { $set: { estado: 'GATEWAY_ASIGNADO', usuarioActualizacion: usuario } });
     await Gateway.updateOne({ _id: gateway._id, estado: 'OCUPADO', pedidoAsignadoId: pedido._id }, { $set: { estado: 'LIBRE', usuarioActualizacion: usuario } });
-    throw error;
-  }
-}
-
-async function finalizarDescargaCompensable(req: Request): Promise<string> {
-  const usuario = req.usuario?.nombreCompleto || 'Sistema';
-  const descargaId = req.body.descargasId ?? req.body.descargaId;
-  const descarga = await Descarga.findOne({ _id: descargaId, activo: true, fechaHoraFin: { $exists: false } });
-  if (!descarga) throw new Error('Descarga activa no encontrada');
-  const [gateway, pedido] = await Promise.all([
-    Gateway.findById(descarga.gatewayId),
-    Pedido.findById(descarga.pedidoId),
-  ]);
-  if (!gateway || !pedido || gateway.estado !== 'OCUPADO' || pedido.estado !== 'DESCARGANDO') {
-    throw new Error('El gateway o pedido no está en estado de descarga');
-  }
-
-  const horaFin = new Date();
-  const duracionMinutos = Math.max(0, (horaFin.getTime() - descarga.fechaHoraInicio.getTime()) / 60000);
-  const descargaFinalizada = await Descarga.findOneAndUpdate(
-    { _id: descarga._id, activo: true, fechaHoraFin: { $exists: false } },
-    { $set: { fechaHoraFin: horaFin, duracionMinutos, usuarioActualizacion: usuario } },
-    { returnDocument: 'after' }
-  );
-  if (!descargaFinalizada) throw new Error('La descarga ya fue finalizada por otro usuario');
-
-  try {
-    const pedidoFinalizado = await Pedido.findOneAndUpdate(
-      { _id: pedido._id, estado: 'DESCARGANDO' },
-      { $set: { estado: 'FINALIZADO', usuarioActualizacion: usuario } },
-      { returnDocument: 'after' }
-    );
-    if (!pedidoFinalizado) throw new Error('No se pudo finalizar el pedido');
-    const gatewayLibre = await Gateway.findOneAndUpdate(
-      { _id: gateway._id, estado: 'OCUPADO', pedidoAsignadoId: pedido._id },
-      { $set: { estado: 'LIBRE', usuarioActualizacion: usuario }, $unset: { pedidoAsignadoId: 1 } },
-      { returnDocument: 'after' }
-    );
-    if (!gatewayLibre) throw new Error('No se pudo liberar el gateway');
-    await registrarAuditoria({
-      entidad: 'Descarga',
-      accion: 'finalizar',
-      detalle: `Finalizó descarga ${pedido.numeroPedido} en Gateway ${gateway.numeroGateway}; duración ${duracionMinutos.toFixed(2)} minutos`,
-      usuario,
-    });
-    return String(descarga._id);
-  } catch (error) {
-    await Pedido.updateOne({ _id: pedido._id, estado: 'FINALIZADO' }, { $set: { estado: 'DESCARGANDO', usuarioActualizacion: usuario } });
-    await Gateway.updateOne({ _id: gateway._id, estado: 'LIBRE' }, { $set: { estado: 'OCUPADO', pedidoAsignadoId: pedido._id, usuarioActualizacion: usuario } });
-    await Descarga.updateOne({ _id: descarga._id }, { $unset: { fechaHoraFin: 1, duracionMinutos: 1 }, $set: { usuarioActualizacion: usuario } });
     throw error;
   }
 }
@@ -166,6 +124,14 @@ export const iniciarDescarga = async (req: Request, res: Response): Promise<void
         usuario: gateway.usuarioActualizacion,
         session,
       });
+      await registrarEvento({
+        usuarioId: String(req.usuario?.id),
+        usuario: gateway.usuarioActualizacion,
+        accion: 'DESCARGADA_INICIADA',
+        pedidoId: String(pedido._id),
+        detalles: { numeroPedido: pedido.numeroPedido, numeroGateway: gateway.numeroGateway },
+        session,
+      });
       });
     } catch (error) {
       if (!transaccionesNoDisponibles(error)) throw error;
@@ -184,8 +150,7 @@ export const finalizarDescarga = async (req: Request, res: Response): Promise<vo
   const session = await mongoose.startSession();
   let descargaId = '';
   try {
-    try {
-      await session.withTransaction(async () => {
+    await session.withTransaction(async () => {
       const descargaIdSolicitada = req.body.descargasId ?? req.body.descargaId;
       const descarga = await Descarga.findOne({ _id: descargaIdSolicitada, activo: true, fechaHoraFin: { $exists: false } }).session(session);
       if (!descarga) throw new Error('Descarga activa no encontrada');
@@ -202,13 +167,26 @@ export const finalizarDescarga = async (req: Request, res: Response): Promise<vo
       descarga.duracionMinutos = Math.max(0, (horaFin.getTime() - descarga.fechaHoraInicio.getTime()) / 60000);
       descarga.usuarioActualizacion = req.usuario?.nombreCompleto || 'Sistema';
       await descarga.save({ session });
+      pedido.estado = 'FINALIZADO';
+      pedido.usuarioActualizacion = descarga.usuarioActualizacion;
+      await pedido.save({ session });
+      await registrarEvento({
+        usuarioId: String(req.usuario?.id),
+        usuario: descarga.usuarioActualizacion,
+        accion: 'DESCARGA_FINALIZADA',
+        pedidoId: String(pedido._id),
+        detalles: {
+          numeroPedido: pedido.numeroPedido,
+          numeroGateway: gateway.numeroGateway,
+          fechaHoraFin: horaFin.toISOString(),
+          duracionMinutos: descarga.duracionMinutos,
+        },
+        session,
+      });
       gateway.estado = 'LIBRE';
       gateway.pedidoAsignadoId = undefined;
       gateway.usuarioActualizacion = descarga.usuarioActualizacion;
       await gateway.save({ session });
-      pedido.estado = 'FINALIZADO';
-      pedido.usuarioActualizacion = descarga.usuarioActualizacion;
-      await pedido.save({ session });
       descargaId = String(descarga._id);
       await registrarAuditoria({
         entidad: 'Descarga',
@@ -217,15 +195,27 @@ export const finalizarDescarga = async (req: Request, res: Response): Promise<vo
         usuario: descarga.usuarioActualizacion,
         session,
       });
+    });
+    try {
+      await reevaluarCola({
+        id: String(req.usuario?.id),
+        nombreCompleto: req.usuario?.nombreCompleto || 'Usuario autenticado',
       });
     } catch (error) {
-      if (!transaccionesNoDisponibles(error)) throw error;
-      descargaId = await finalizarDescargaCompensable(req);
+      console.error('La descarga finalizó, pero no se pudo reevaluar la cola:', error);
+      res.status(500).json({
+        mensaje: 'La descarga finalizó correctamente, pero no se pudo reevaluar la cola. Reintente la reevaluación.',
+        descargaFinalizada: true,
+      });
+      return;
     }
-    await reevaluarCola();
     const descarga = await Descarga.findById(descargaId).populate('pedidoId', 'numeroPedido estado').populate('gatewayId', 'numeroGateway estado');
     res.status(200).json({ mensaje: 'Descarga finalizada y gateway liberado', descarga });
   } catch (error) {
+    if (transaccionesNoDisponibles(error)) {
+      res.status(503).json({ mensaje: 'La finalización requiere MongoDB con replica set; no se modificó la descarga ni se liberó el gateway' });
+      return;
+    }
     res.status(400).json({ mensaje: error instanceof Error ? error.message : 'No se pudo finalizar descarga' });
   } finally {
     await session.endSession();

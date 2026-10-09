@@ -9,6 +9,7 @@ export type PestanaDashboard =
   | 'caseta'
   | 'mantenimientos'
   | 'auditoria'
+  | 'kpis'
   | 'parametros'
   | 'gateways';
 
@@ -27,11 +28,16 @@ const MENU_ITEMS: Array<{ key: PestanaDashboard; label: string; icon: string }> 
   { key: 'caseta', label: 'Caseta', icon: '◫' },
   { key: 'gateways', label: 'Gateways', icon: '▦' },
   { key: 'auditoria', label: 'Auditoría', icon: '◌' },
+  { key: 'kpis', label: 'Indicadores logísticos', icon: '▥' },
 ];
 
 export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerrar }: SidebarProps) {
   const items = [
-    ...MENU_ITEMS.filter((item) => item.key !== 'auditoria' || rol !== 'operador'),
+    ...MENU_ITEMS.filter((item) => {
+      if (item.key === 'auditoria') return rol !== 'operador';
+      if (item.key === 'kpis') return rol === 'administrador' || rol === 'coordinador';
+      return true;
+    }),
     ...(rol === 'administrador' ? [{ key: 'parametros' as const, label: 'Parámetros', icon: '⚙' }] : []),
   ];
 
