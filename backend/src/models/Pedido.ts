@@ -1,0 +1,101 @@
+import { Schema, model, type Document, type Types } from 'mongoose';
+
+export type TipoProducto = 'construcción' | 'general';
+export type EstadoPedido = 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'EN_COLA' | 'GATEWAY_ASIGNADO' | 'DESCARGANDO' | 'FINALIZADO' | 'CANCELADO';
+
+export interface IPedido extends Document {
+  numeroPedido: string;
+  proveedorId: Types.ObjectId;
+  tipoProducto: TipoProducto;
+  fechaHoraProgramada: Date;
+  inicioVentana: Date;
+  finVentana: Date;
+  duracionEstimadaMinutos: number;
+  fechaHoraLlegadaReal?: Date;
+  estado: EstadoPedido;
+  clasificacionPuntualidad?: 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO';
+  gatewayId?: Types.ObjectId;
+  fechaEntradaCola?: Date;
+  activo: boolean;
+  usuarioCreacion: string;
+  usuarioActualizacion: string;
+  fechaCreacion?: Date;
+  fechaActualizacion?: Date;
+}
+
+const pedidoSchema = new Schema<IPedido>(
+  {
+    numeroPedido: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+    proveedorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Proveedor',
+      required: true,
+    },
+    tipoProducto: {
+      type: String,
+      required: true,
+      enum: ['construcción', 'general'] satisfies TipoProducto[],
+    },
+    fechaHoraProgramada: {
+      type: Date,
+      required: true,
+    },
+    inicioVentana: {
+      type: Date,
+      required: true,
+    },
+    finVentana: {
+      type: Date,
+      required: true,
+    },
+    duracionEstimadaMinutos: {
+      type: Number,
+      required: true,
+      min: [1, 'La duración debe ser mayor a cero'],
+    },
+    fechaHoraLlegadaReal: {
+      type: Date,
+    },
+    gatewayId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Gateway',
+    },
+    fechaEntradaCola: {
+      type: Date,
+    },
+    estado: {
+      type: String,
+      enum: ['PROGRAMADO', 'ANTICIPADO', 'A TIEMPO', 'TARDÍO', 'AUSENTE', 'EN_COLA', 'GATEWAY_ASIGNADO', 'DESCARGANDO', 'FINALIZADO', 'CANCELADO'] satisfies EstadoPedido[],
+      default: 'PROGRAMADO',
+    },
+    clasificacionPuntualidad: {
+      type: String,
+      enum: ['ANTICIPADO', 'A TIEMPO', 'TARDÍO'],
+    },
+    activo: {
+      type: Boolean,
+      default: true,
+      required: true,
+    },
+    usuarioCreacion: {
+      type: String,
+      required: true,
+      default: 'Sistema',
+    },
+    usuarioActualizacion: {
+      type: String,
+      required: true,
+      default: 'Sistema',
+    },
+  },
+  { 
+    timestamps: { createdAt: 'fechaCreacion', updatedAt: 'fechaActualizacion' } 
+  }
+);
+
+export const Pedido = model<IPedido>('Pedido', pedidoSchema);
