@@ -1,6 +1,7 @@
 'use client';
 
 import type { Rol } from '../../permisos';
+import { useRouter } from 'next/navigation';
 
 export type PestanaDashboard =
   | 'inicio'
@@ -32,6 +33,7 @@ const MENU_ITEMS: Array<{ key: PestanaDashboard; label: string; icon: string }> 
 ];
 
 export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerrar }: SidebarProps) {
+  const router = useRouter();
   const items = [
     ...MENU_ITEMS.filter((item) => {
       if (item.key === 'auditoria') return rol !== 'operador';
@@ -68,6 +70,20 @@ export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerr
             <span>{item.label}</span>
           </button>
         ))}
+        {rol === 'administrador' && (
+          <button
+            type="button"
+            className="dashboard-nav-item"
+            tabIndex={abierto ? 0 : -1}
+            onClick={() => {
+              router.push('/usuarios/gestion');
+              onCerrar();
+            }}
+          >
+            <span className="dashboard-nav-icon" aria-hidden="true">♙</span>
+            <span>Administrar usuarios</span>
+          </button>
+        )}
       </nav>
     </aside>
   );
