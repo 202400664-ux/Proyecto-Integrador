@@ -35,6 +35,10 @@ export async function autenticar(req: Request, res: Response, next: NextFunction
   let idUsuario: string;
   try {
     const payload = jwt.verify(token, claveSecreta);
+    if (typeof payload !== 'string' && payload.type === 'MFA_TEMP') {
+      res.status(403).json({ mensaje: 'El token temporal MFA no permite acceder a rutas operativas' });
+      return;
+    }
     if (typeof payload === 'string' || typeof payload.id !== 'string') {
       res.status(401).json({ mensaje: 'Token de autenticación inválido' });
       return;
@@ -47,9 +51,9 @@ export async function autenticar(req: Request, res: Response, next: NextFunction
 
   try {
     const usuario = await Usuario.findById(idUsuario)
-      .select('nombres apellidosCompleto email estado roles')
+      .select('nombres apellidosCompleto email estado activo roles')
       .populate<{ roles: IRole[] }>({ path: 'roles', model: Role });
-    if (!usuario || usuario.estado !== 'activo') {
+    if (!usuario || usuario.activo === false || usuario.estado !== 'activo') {
       res.status(401).json({ mensaje: 'La sesión no pertenece a un usuario activo' });
       return;
     }

@@ -17,6 +17,8 @@ import { autenticar, requiereRol } from './middleware/autenticacion.js';
 import notificacionesRoutes from './routes/notificaciones.js';
 import eventosRoutes from './routes/eventos.js';
 import dashboardRoutes from './routes/dashboard.js';
+import mfaRoutes from './routes/mfaRoutes.js';
+import usuariosRoutes from './routes/usuariosRoutes.js';
 
 dotenv.config();
 
@@ -38,6 +40,9 @@ mongoose
 
 // 2. Registrar las rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/mfa', mfaRoutes);
+app.use('/api/mfa', mfaRoutes);
+app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/proveedores', proveedoresRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/llegadas', autenticar, requiereRol('administrador', 'coordinador', 'operador'), llegadasRoutes);

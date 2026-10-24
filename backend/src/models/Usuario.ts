@@ -9,8 +9,15 @@ export interface IUsuario extends Document {
   password: string;
   roles: Types.ObjectId[];
   estado: 'activo' | 'inactivo';
-  createdAt?: Date;
-  updatedAt?: Date;
+  activo: boolean;
+  mfaObligatorio: boolean;
+  twoFactorSecret?: string;
+  twoFactorEnabled: boolean;
+  twoFactorRecoveryCodes: string[];
+  usuarioCreacion: string;
+  usuarioActualizacion: string;
+  fechaCreacion?: Date;
+  fechaActualizacion?: Date;
 }
 
 // 2. Definición del Esquema
@@ -36,6 +43,7 @@ const usuarioSchema = new Schema<IUsuario>(
     password: {
       type: String,
       required: true,
+      select: false,
     },
     roles: [{
       type: Schema.Types.ObjectId,
@@ -48,8 +56,42 @@ const usuarioSchema = new Schema<IUsuario>(
       default: 'activo',
       required: true,
     },
+    activo: {
+      type: Boolean,
+      default: true,
+      required: true,
+    },
+    mfaObligatorio: {
+      type: Boolean,
+      default: false,
+      required: true,
+    },
+    twoFactorSecret: {
+      type: String,
+      select: false,
+    },
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+      required: true,
+    },
+    twoFactorRecoveryCodes: {
+      type: [String],
+      default: [],
+      select: false,
+    },
+    usuarioCreacion: {
+      type: String,
+      default: 'Sistema',
+      required: true,
+    },
+    usuarioActualizacion: {
+      type: String,
+      default: 'Sistema',
+      required: true,
+    },
   },
-  { timestamps: true }
+  { timestamps: { createdAt: 'fechaCreacion', updatedAt: 'fechaActualizacion' } }
 );
 
 // 3. Middleware Pre-Save tipado para hash de contraseña

@@ -28,6 +28,10 @@ export const autenticar = (req: Request, res: Response, next: NextFunction): voi
 
   try {
     const payload = jwt.verify(token, secret);
+    if (typeof payload !== 'string' && payload.type === 'MFA_TEMP') {
+      res.status(403).json({ mensaje: 'El token temporal MFA no permite acceder a rutas operativas' });
+      return;
+    }
     if (typeof payload === 'string' || !payload.id || !payload.rol) {
       res.status(401).json({ mensaje: 'Token de sesión inválido' });
       return;

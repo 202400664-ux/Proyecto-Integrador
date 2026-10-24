@@ -1,8 +1,9 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
 export type RoleName = 'administrador' | 'coordinador' | 'operador';
 
 export interface IRole extends Document {
+  _id: Types.ObjectId;
   nombre: RoleName;
   descripcion: string;
 }
