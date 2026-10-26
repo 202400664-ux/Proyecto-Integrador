@@ -1,7 +1,7 @@
 'use client';
 
 import type { Rol } from '../../permisos';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export type PestanaDashboard =
   | 'inicio'
@@ -34,6 +34,8 @@ const MENU_ITEMS: Array<{ key: PestanaDashboard; label: string; icon: string }> 
 
 export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerrar }: SidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const administrandoUsuarios = pathname === '/usuarios/gestion';
   const items = [
     ...MENU_ITEMS.filter((item) => {
       if (item.key === 'auditoria') return rol !== 'operador';
@@ -57,8 +59,8 @@ export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerr
           <button
             key={item.key}
             type="button"
-            className={`dashboard-nav-item ${pestanaActiva === item.key ? 'active' : ''}`}
-            aria-current={pestanaActiva === item.key ? 'page' : undefined}
+            className={`dashboard-nav-item ${!administrandoUsuarios && pestanaActiva === item.key ? 'active' : ''}`}
+            aria-current={!administrandoUsuarios && pestanaActiva === item.key ? 'page' : undefined}
             onClick={() => {
               onNavegar(item.key);
               onCerrar();
@@ -71,7 +73,8 @@ export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerr
         {rol === 'administrador' && (
           <button
             type="button"
-            className="dashboard-nav-item"
+            className={`dashboard-nav-item ${administrandoUsuarios ? 'active' : ''}`}
+            aria-current={administrandoUsuarios ? 'page' : undefined}
             onClick={() => {
               router.push('/usuarios/gestion');
               onCerrar();
