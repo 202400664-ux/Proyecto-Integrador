@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
 import { esRolValido, type Rol } from './permisos';
 import { RolProvider } from './RolContext';
@@ -67,6 +67,7 @@ interface RoleDashboardProps {
 export default function RoleDashboard({ children }: RoleDashboardProps) {
   const rol = useSyncExternalStore(subscribeToSession, readRoleFromToken, () => null);
   const router = useRouter();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pestanaActiva, setPestanaActiva] = useState<PestanaDashboard>('inicio');
   const [navegacionSeleccionada, setNavegacionSeleccionada] = useState(false);
@@ -104,7 +105,25 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
 
     window.addEventListener('dashboard:show-home', onShowHome);
     window.addEventListener('dashboard:select-tab', onSelectTab as EventListener);
+    const requestedTab = new URLSearchParams(window.location.search).get('tab');
+    const validTabs: PestanaDashboard[] = [
+      'inicio',
+      'proveedores',
+      'pedidos',
+      'caseta',
+      'mantenimientos',
+      'auditoria',
+      'kpis',
+      'parametros',
+      'gateways',
+    ];
+    const timer = window.setTimeout(() => {
+      if (requestedTab && validTabs.includes(requestedTab as PestanaDashboard)) {
+        window.dispatchEvent(new CustomEvent('dashboard:select-tab', { detail: requestedTab }));
+      }
+    }, 0);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener('dashboard:show-home', onShowHome);
       window.removeEventListener('dashboard:select-tab', onSelectTab as EventListener);
     };
@@ -118,6 +137,12 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
   };
 
   const navegar = (pestana: PestanaDashboard) => {
+    if (pathname !== '/dashboard') {
+      router.push(`/dashboard?tab=${encodeURIComponent(pestana)}`);
+      setSidebarOpen(false);
+      return;
+    }
+
     setNavegacionSeleccionada(true);
     setPestanaActiva(pestana);
     if (pestana === 'inicio') {

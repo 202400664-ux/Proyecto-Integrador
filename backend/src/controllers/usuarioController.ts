@@ -165,3 +165,28 @@ export async function actualizarUsuario(req: Request, res: Response): Promise<vo
     throw error;
   }
 }
+
+export async function restablecerMfaUsuario(req: Request, res: Response): Promise<void> {
+  if (!isValidObjectId(req.params.id)) {
+    res.status(400).json({ mensaje: 'El identificador del usuario no es válido' });
+    return;
+  }
+
+  const usuario = await Usuario.findById(req.params.id).select('+twoFactorSecret +twoFactorRecoveryCodes');
+  if (!usuario) {
+    res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    return;
+  }
+
+  usuario.twoFactorSecret = undefined;
+  usuario.twoFactorEnabled = false;
+  usuario.twoFactorRecoveryCodes = [];
+  usuario.usuarioActualizacion = req.usuarioAutenticado?.nombreCompleto ?? 'Sistema';
+  await usuario.save();
+
+  res.status(200).json({
+    mensaje: usuario.mfaObligatorio
+      ? 'MFA restablecido. El usuario deberá enrolarse de nuevo en su próximo inicio de sesión.'
+      : 'MFA restablecido. El usuario podrá iniciar sesión sin código mientras MFA no sea obligatorio.',
+  });
+}

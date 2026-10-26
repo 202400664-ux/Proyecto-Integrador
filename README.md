@@ -25,6 +25,6 @@ El Sprint 4 expone los eventos de auditoría de solo lectura en `GET /api/evento
 
 ## Sprint 5: Autenticación multifactor
 
-Desde el panel de un administrador, abra **Administrar usuarios** para crear usuarios o cambiar el requisito **Requerir Autenticación Multifactor (MFA)**. Cuando ese requisito esté activo, el siguiente inicio de sesión solicita enrolamiento en Google Authenticator mediante un QR; los accesos posteriores requieren el código TOTP de seis dígitos.
+Desde el panel de un administrador, abra **Administrar usuarios** para crear usuarios o cambiar el requisito **Requerir Autenticación Multifactor (MFA)**. Cuando ese requisito esté activo, el siguiente inicio de sesión solicita enrolamiento en Google Authenticator mediante un QR; los accesos posteriores requieren el código TOTP de seis dígitos. Al desactivar el requisito, el usuario puede iniciar sesión sin código aunque conserve su enrolamiento. El enrolamiento solo se elimina con **Restablecer MFA** en la fila del usuario; si la obligatoriedad sigue activa, tendrá que enrolarse de nuevo en su próximo inicio de sesión.
 
 El backend expone `POST /api/auth/login`, `POST /api/mfa/setup`, `POST /api/mfa/enable` y `POST /api/auth/mfa/verify-login`. Las rutas de enrolamiento y verificación aceptan únicamente un token `MFA_TEMP` con vigencia máxima de cinco minutos; los middleware de rutas operativas lo rechazan. Los secretos TOTP y las contraseñas se excluyen de las consultas normales. El JWT de sesión emitido tras la autenticación expira a las ocho horas.

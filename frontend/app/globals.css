@@ -59,6 +59,7 @@ body {
 }
 
 .dashboard-menu-button {
+  display: none;
   width: 2.8rem;
   height: 2.8rem;
   border: 1px solid rgba(241, 189, 75, 0.35);
@@ -71,6 +72,12 @@ body {
   gap: 0.28rem;
   padding: 0.55rem;
   flex-shrink: 0;
+}
+
+@media (min-width: 901px) {
+  .dashboard-brand-block > .dashboard-menu-button {
+    display: none !important;
+  }
 }
 
 .dashboard-menu-button span {
@@ -162,10 +169,6 @@ body {
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.dashboard-layout.sidebar-expanded {
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 1.5rem;
   align-items: start;
@@ -190,6 +193,12 @@ body {
 
 .dashboard-sidebar.closed {
   display: none;
+}
+
+@media (min-width: 901px) {
+  .dashboard-sidebar.closed {
+    display: flex;
+  }
 }
 
 .dashboard-sidebar-header {
@@ -378,6 +387,10 @@ body {
 
 .dashboard-panel .btn-primary:hover {
   background: linear-gradient(135deg, #1a6d9b, #0f2c42);
+}
+
+.dashboard-panel .user-management .btn {
+  border-radius: 0.8rem;
 }
 
 .pedido-form-actions {
@@ -889,6 +902,10 @@ body {
     align-items: flex-start;
   }
 
+  .dashboard-menu-button {
+    display: inline-flex;
+  }
+
   .dashboard-title-wrap h1 {
     font-size: clamp(1.15rem, 6vw, 1.7rem);
   }
@@ -906,7 +923,7 @@ body {
     padding: 1rem;
   }
 
-  .dashboard-layout.sidebar-expanded {
+  .dashboard-layout {
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }

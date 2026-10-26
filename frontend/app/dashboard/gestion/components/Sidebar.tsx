@@ -48,7 +48,6 @@ export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerr
       id="dashboard-sidebar"
       className={`dashboard-sidebar ${abierto ? 'open' : 'closed'}`}
       aria-label="Navegación principal"
-      aria-hidden={!abierto}
     >
       <div className="dashboard-sidebar-header">
         <div className="dashboard-sidebar-brand">LOGÍSTICA</div>
@@ -60,7 +59,6 @@ export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerr
             type="button"
             className={`dashboard-nav-item ${pestanaActiva === item.key ? 'active' : ''}`}
             aria-current={pestanaActiva === item.key ? 'page' : undefined}
-            tabIndex={abierto ? 0 : -1}
             onClick={() => {
               onNavegar(item.key);
               onCerrar();
@@ -74,7 +72,6 @@ export default function Sidebar({ rol, abierto, pestanaActiva, onNavegar, onCerr
           <button
             type="button"
             className="dashboard-nav-item"
-            tabIndex={abierto ? 0 : -1}
             onClick={() => {
               router.push('/usuarios/gestion');
               onCerrar();

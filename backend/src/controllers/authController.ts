@@ -42,7 +42,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     const nombreCompleto = `${usuario.nombres} ${usuario.apellidosCompleto}`.trim();
 
-    if (usuario.mfaObligatorio || usuario.twoFactorEnabled) {
+    if (usuario.mfaObligatorio) {
       const tempToken = jwt.sign(
         { id: usuario._id, type: 'MFA_TEMP' },
         secretKey,
