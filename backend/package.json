@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/seed.ts",
-    "test": "tsx --test src/services/colaPrioridad.test.ts src/controllers/descargaController.integration.test.ts src/services/sprint3.integration.test.ts",
+    "test": "tsx --test src/services/reglasNegocio.test.ts src/services/colaPrioridad.test.ts src/controllers/descargaController.integration.test.ts src/services/sprint3.integration.test.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },

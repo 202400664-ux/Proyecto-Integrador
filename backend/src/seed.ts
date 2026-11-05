@@ -30,6 +30,9 @@ const crearUsuarioSemilla = async () => {
       { clave: 'numero_equipo', valor: process.env.EQUIPO_NUMERO || '04', descripcion: 'Número del equipo para generar pedidos correlativos' },
       { clave: 'horario_inicio_operativo', valor: '07:00', descripcion: 'Hora de apertura del centro logístico' },
       { clave: 'horario_fin_operativo', valor: '17:00', descripcion: 'Hora de cierre del centro logístico' },
+      { clave: 'tolerancia_anticipado_minutos', valor: '15', descripcion: 'RN-04: minutos de tolerancia antes del inicio de la ventana' },
+      { clave: 'tolerancia_tardio_minutos', valor: '15', descripcion: 'RN-04: minutos de tolerancia después del fin de la ventana' },
+      { clave: 'tolerancia_ausente_minutos', valor: '30', descripcion: 'RN-05: minutos tras el fin de la ventana para marcar AUSENTE' },
     ];
     for (const parametroBase of parametrosHorario) {
       const existente = await Parametro.findOne({ clave: parametroBase.clave });
