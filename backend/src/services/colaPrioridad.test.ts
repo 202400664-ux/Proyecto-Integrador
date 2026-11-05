@@ -15,7 +15,7 @@ function pedido(numeroPedido: string, estado: 'TARDÍO' | 'A TIEMPO' | 'ANTICIPA
   };
 }
 
-test('prioriza puntualidad cuando el tiempo de espera es equivalente', () => {
+test('PU-11 MaxHeapPedidos prioriza puntualidad cuando el tiempo de espera es equivalente', () => {
   const heap = new MaxHeapPedidos(ahora);
   heap.push(pedido('ANT-1', 'ANTICIPADO', 0));
   heap.push(pedido('ATI-1', 'A TIEMPO', 0));
@@ -26,7 +26,7 @@ test('prioriza puntualidad cuando el tiempo de espera es equivalente', () => {
   assert.equal(heap.pop()?.numeroPedido, 'ANT-1');
 });
 
-test('aging puede promover un pedido que ha esperado más tiempo', () => {
+test('PU-12 MaxHeapPedidos: el aging puede promover un pedido que ha esperado más tiempo', () => {
   const heap = new MaxHeapPedidos(ahora);
   heap.push(pedido('TAR-RECIENTE', 'TARDÍO', 0));
   heap.push(pedido('ATI-ESPERA', 'A TIEMPO', 20));

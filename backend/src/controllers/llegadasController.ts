@@ -4,6 +4,7 @@ import { Parametro } from '../models/Parametro.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { encolarPedido } from '../services/colaPrioridad.js';
 import { registrarEvento } from '../services/eventos.js';
+import { evaluarTolerancia, puedeIngresarACola, TOLERANCIAS_POR_DEFECTO } from '../services/reglasNegocio.js';
 
 /** Lee un parámetro numérico de tolerancia; si no existe, usa el valor por defecto. */
 async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Promise<number> {
@@ -44,19 +45,15 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
 
     // Tolerancias configurables desde la colección parametros (RN: comparar
     // contra parametros, no contra un valor fijo en el código).
-    const toleranciaAnticipadoMin = await obtenerToleranciaMinutos('tolerancia_anticipado_minutos', 0);
-    const toleranciaTardioMin = await obtenerToleranciaMinutos('tolerancia_tardio_minutos', 0);
+    const toleranciaAnticipadoMin = await obtenerToleranciaMinutos('tolerancia_anticipado_minutos', TOLERANCIAS_POR_DEFECTO.anticipado);
+    const toleranciaTardioMin = await obtenerToleranciaMinutos('tolerancia_tardio_minutos', TOLERANCIAS_POR_DEFECTO.tardio);
 
-    const inicioConTolerancia = new Date(pedido.inicioVentana).getTime() - toleranciaAnticipadoMin * 60000;
-    const finConTolerancia = new Date(pedido.finVentana).getTime() + toleranciaTardioMin * 60000;
-    const llegada = fechaLlegadaReal.getTime();
-
-    let nuevoEstado: 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' = 'A TIEMPO';
-    if (llegada < inicioConTolerancia) {
-      nuevoEstado = 'ANTICIPADO';
-    } else if (llegada > finConTolerancia) {
-      nuevoEstado = 'TARDÍO';
-    }
+    // RN-04: la clasificación se delega a una función pura con pruebas unitarias.
+    const nuevoEstado = evaluarTolerancia(
+      fechaLlegadaReal,
+      { inicioVentana: pedido.inicioVentana, finVentana: pedido.finVentana },
+      { anticipado: toleranciaAnticipadoMin, tardio: toleranciaTardioMin }
+    );
 
     pedido.estado = nuevoEstado;
     pedido.clasificacionPuntualidad = nuevoEstado;
@@ -97,7 +94,11 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
 
     let advertenciaCola: string | undefined;
     try {
-      await encolarPedido(String(pedido._id), { id: autenticado.id, nombreCompleto: actor });
+      // HU-02 (escenario 2): un pedido ANTICIPADO espera en garita sin gateway
+      // hasta que inicia su ventana; la cola lo libera en ese momento.
+      if (puedeIngresarACola(nuevoEstado, pedido.inicioVentana, fechaLlegadaReal)) {
+        await encolarPedido(String(pedido._id), { id: autenticado.id, nombreCompleto: actor });
+      }
     } catch (error) {
       console.error('No se pudo procesar el pedido en la cola de gateways:', error);
       advertenciaCola = 'El arribo quedó registrado, pero no se pudo procesar la asignación automática en la cola.';
@@ -122,7 +123,7 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
  * un proceso en segundo plano (cron) separado.
  */
 export async function marcarPedidosAusentes(): Promise<void> {
-  const toleranciaAusenteMin = await obtenerToleranciaMinutos('tolerancia_ausente_minutos', 0);
+  const toleranciaAusenteMin = await obtenerToleranciaMinutos('tolerancia_ausente_minutos', TOLERANCIAS_POR_DEFECTO.ausente);
   const limite = new Date(Date.now() - toleranciaAusenteMin * 60000);
 
   await Pedido.updateMany(

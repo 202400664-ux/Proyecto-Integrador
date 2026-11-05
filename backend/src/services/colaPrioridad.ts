@@ -4,6 +4,7 @@ import { Pedido, type EstadoPedido, type TipoProducto } from '../models/Pedido.j
 import { registrarAuditoria } from '../controllers/auditoriaController.js';
 import { notificarRol } from './notificaciones.js';
 import { registrarEvento } from './eventos.js';
+import { validarCompatibilidadBahia } from './reglasNegocio.js';
 
 export interface ActorOperativo {
   id: string;
@@ -79,7 +80,20 @@ export class MaxHeapPedidos {
   }
 }
 
+/**
+ * Pasa a la cola los pedidos ANTICIPADO cuya ventana ya inició (HU-02, escenario 2).
+ * Conserva la clasificación original para el cálculo de prioridad.
+ */
+export async function liberarAnticipados(ahora = new Date()): Promise<number> {
+  const resultado = await Pedido.updateMany(
+    { activo: true, estado: 'ANTICIPADO', inicioVentana: { $lte: ahora } },
+    { $set: { estado: 'EN_COLA', clasificacionPuntualidad: 'ANTICIPADO', fechaEntradaCola: ahora, usuarioActualizacion: 'Motor EDA 0' } }
+  );
+  return resultado.modifiedCount;
+}
+
 export async function reevaluarCola(actor: ActorOperativo): Promise<void> {
+  await liberarAnticipados();
   const pedidos = await Pedido.find({ activo: true, estado: 'EN_COLA' })
     .sort({ fechaEntradaCola: 1 })
     .lean<PedidoEnCola[]>();
@@ -92,10 +106,7 @@ export async function reevaluarCola(actor: ActorOperativo): Promise<void> {
   for (const gateway of gateways) {
     const heap = new MaxHeapPedidos(ahora);
     for (const pedido of pedidos) {
-      const tipoCompatible = gateway.numeroGateway === 5
-        ? pedido.tipoProducto === 'construcción'
-        : pedido.tipoProducto === 'general';
-      if (tipoCompatible) heap.push(pedido);
+      if (validarCompatibilidadBahia(gateway, pedido.tipoProducto)) heap.push(pedido);
     }
     const candidato = heap.pop();
     if (!candidato) continue;
@@ -173,6 +184,7 @@ export async function encolarPedido(pedidoId: string, actor: ActorOperativo): Pr
 }
 
 export async function listarColaPrioridad(): Promise<PedidoEnCola[]> {
+  await liberarAnticipados();
   const pedidos = await Pedido.find({ activo: true, estado: 'EN_COLA' }).lean<PedidoEnCola[]>();
   const heap = new MaxHeapPedidos();
   pedidos.forEach((pedido) => heap.push(pedido));
