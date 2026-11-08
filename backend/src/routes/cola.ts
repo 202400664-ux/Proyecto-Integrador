@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { asignarDesdeCola, obtenerCola, reevaluarColaController } from '../controllers/colaController.js';
-import { autenticar, requiereRol } from '../middleware/autenticacion.js';
+import { autenticar } from '../middleware/autenticacion.js';
+import { checkPermission } from '../middleware/checkPermission.js';
 
 const router = Router();
-router.use(autenticar);
+router.use(autenticar, checkPermission('cola', 'descargas', 'gateways'));
 router.get('/', obtenerCola);
-router.post('/asignar', requiereRol('administrador', 'coordinador', 'operador'), asignarDesdeCola);
-router.post('/reevaluar', requiereRol('administrador', 'coordinador', 'operador'), reevaluarColaController);
+router.post('/asignar', asignarDesdeCola);
+router.post('/reevaluar', reevaluarColaController);
 export default router;

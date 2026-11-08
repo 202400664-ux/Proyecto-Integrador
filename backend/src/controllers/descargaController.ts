@@ -21,7 +21,7 @@ async function iniciarDescargaCompensable(req: Request): Promise<string> {
   if (!gateway || !pedido) throw new Error('Pedido o gateway no encontrado');
   const cargaEsperada = gateway.numeroGateway === 5 ? 'construcción' : 'general';
   if (gateway.estado !== 'LIBRE' || String(gateway.pedidoAsignadoId) !== String(pedido._id) ||
-      pedido.estado !== 'GATEWAY_ASIGNADO' || String(pedido.gatewayId) !== String(gateway._id) ||
+      pedido.estado !== 'GATEWAY ASIGNADO' || String(pedido.gatewayId) !== String(gateway._id) ||
       pedido.tipoProducto !== cargaEsperada || gateway.tipoCargaPermitida !== cargaEsperada) {
     throw new Error('Pedido y gateway no tienen una asignación compatible y disponible');
   }
@@ -36,7 +36,7 @@ async function iniciarDescargaCompensable(req: Request): Promise<string> {
   let descargaId = '';
   try {
     const pedidoDescargando = await Pedido.findOneAndUpdate(
-      { _id: pedido._id, estado: 'GATEWAY_ASIGNADO', gatewayId: gateway._id, activo: true },
+      { _id: pedido._id, estado: 'GATEWAY ASIGNADO', gatewayId: gateway._id, activo: true },
       { $set: { estado: 'DESCARGANDO', usuarioActualizacion: usuario } },
       { returnDocument: 'after' }
     );
@@ -62,7 +62,7 @@ async function iniciarDescargaCompensable(req: Request): Promise<string> {
     return descargaId;
   } catch (error) {
     if (descargaId) await Descarga.updateOne({ _id: descargaId }, { $set: { activo: false, usuarioActualizacion: usuario } });
-    await Pedido.updateOne({ _id: pedido._id, estado: 'DESCARGANDO' }, { $set: { estado: 'GATEWAY_ASIGNADO', usuarioActualizacion: usuario } });
+    await Pedido.updateOne({ _id: pedido._id, estado: 'DESCARGANDO' }, { $set: { estado: 'GATEWAY ASIGNADO', usuarioActualizacion: usuario } });
     await Gateway.updateOne({ _id: gateway._id, estado: 'OCUPADO', pedidoAsignadoId: pedido._id }, { $set: { estado: 'LIBRE', usuarioActualizacion: usuario } });
     throw error;
   }
@@ -93,7 +93,7 @@ export const iniciarDescarga = async (req: Request, res: Response): Promise<void
       if (gateway.estado !== 'LIBRE' || String(gateway.pedidoAsignadoId) !== String(pedido._id)) {
         throw new Error('El gateway debe estar libre y asignado a este pedido');
       }
-      if (pedido.estado !== 'GATEWAY_ASIGNADO' || String(pedido.gatewayId) !== String(gateway._id)) {
+      if (pedido.estado !== 'GATEWAY ASIGNADO' || String(pedido.gatewayId) !== String(gateway._id)) {
         throw new Error('El pedido no tiene asignado este gateway');
       }
       const cargaEsperada = gateway.numeroGateway === 5 ? 'construcción' : 'general';

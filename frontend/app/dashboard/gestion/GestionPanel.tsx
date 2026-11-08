@@ -27,6 +27,8 @@ type Pestana = 'inicio' | 'proveedores' | 'pedidos' | 'caseta' | 'gateways' | 'm
  */
 export default function GestionPanel() {
   const { puede, rol } = useRol();
+  const cargaProveedores = puede('proveedores.ver') || puede('pedidos.crear');
+  const cargaPedidos = puede('pedidos.ver') || puede('caseta.registrar');
   const [pestana, setPestana] = useState<Pestana>(() => rol === 'coordinador' ? 'gateways' : 'inicio');
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -54,8 +56,8 @@ export default function GestionPanel() {
     const cargarDatos = async () => {
       try {
         const [listaProveedores, listaPedidos] = await Promise.all([
-          obtenerProveedores(),
-          obtenerPedidos(),
+          cargaProveedores ? obtenerProveedores() : Promise.resolve([]),
+          cargaPedidos ? obtenerPedidos() : Promise.resolve([]),
         ]);
         if (!activo) return;
         setProveedores(listaProveedores);
@@ -77,7 +79,7 @@ export default function GestionPanel() {
     return () => {
       activo = false;
     };
-  }, []);
+  }, [cargaProveedores, cargaPedidos]);
 
   useEffect(() => {
     if (!categoriaProveedor) return;
@@ -132,32 +134,41 @@ export default function GestionPanel() {
             </div>
           </div>
           <div className="row g-3">
-            <div className="col-md-4">
-              <button type="button" className="dashboard-home-tile" onClick={() => navegarA('proveedores')}>
-                <span>Proveedores activos</span>
-                <strong>{proveedores.length}</strong>
-                <small>Administrar proveedores</small>
-              </button>
-            </div>
-            <div className="col-md-4">
-              <button type="button" className="dashboard-home-tile" onClick={() => navegarA('pedidos')}>
-                <span>Pedidos en agenda</span>
-                <strong>{pedidos.length}</strong>
-                <small>Ver programación</small>
-              </button>
-            </div>
-            <div className="col-md-4">
-              <button type="button" className="dashboard-home-tile" onClick={() => navegarA('caseta')}>
-                <span>Arribos por registrar</span>
-                <strong>{pedidos.filter((pedido) => pedido.estado === 'PROGRAMADO').length}</strong>
-                <small>Abrir caseta</small>
-              </button>
-            </div>
+            {puede('proveedores.ver') && (
+              <div className="col-md-4">
+                <button type="button" className="dashboard-home-tile" onClick={() => navegarA('proveedores')}>
+                  <span>Proveedores activos</span>
+                  <strong>{proveedores.length}</strong>
+                  <small>Administrar proveedores</small>
+                </button>
+              </div>
+            )}
+            {puede('pedidos.ver') && (
+              <div className="col-md-4">
+                <button type="button" className="dashboard-home-tile" onClick={() => navegarA('pedidos')}>
+                  <span>Pedidos en agenda</span>
+                  <strong>{pedidos.length}</strong>
+                  <small>Ver programación</small>
+                </button>
+              </div>
+            )}
+            {puede('caseta.registrar') && (
+              <div className="col-md-4">
+                <button type="button" className="dashboard-home-tile" onClick={() => navegarA('caseta')}>
+                  <span>Arribos por registrar</span>
+                  <strong>{pedidos.filter((pedido) => pedido.estado === 'PROGRAMADO').length}</strong>
+                  <small>Abrir caseta</small>
+                </button>
+              </div>
+            )}
+            {!puede('proveedores.ver') && !puede('pedidos.ver') && !puede('caseta.registrar') && (
+              <p className="text-secondary mb-0">Use el menú para abrir los módulos habilitados en su perfil.</p>
+            )}
           </div>
         </section>
       )}
 
-      {pestana === 'proveedores' && (
+      {pestana === 'proveedores' && puede('proveedores.ver') && (
         <>
           {puede('proveedores.crear') && (
             <ProveedorForm
@@ -213,7 +224,7 @@ export default function GestionPanel() {
         </>
       )}
 
-      {pestana === 'pedidos' && (
+      {pestana === 'pedidos' && puede('pedidos.ver') && (
         <>
           {mensajePedido && <div className="alert alert-success" role="status">{mensajePedido}</div>}
           {puede('pedidos.crear') && (
@@ -265,7 +276,7 @@ export default function GestionPanel() {
       )}
 
       {/* 👈 4. Contenido renderizado para Caseta de Arribos */}
-      {pestana === 'caseta' && (
+      {pestana === 'caseta' && puede('caseta.registrar') && (
         <CasetaArribosForm
           onArriboRegistrado={async () => {
             try {

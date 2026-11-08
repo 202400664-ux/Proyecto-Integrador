@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/seed.ts",
-    "test": "tsx --test src/services/reglasNegocio.test.ts src/services/colaPrioridad.test.ts src/controllers/descargaController.integration.test.ts src/services/sprint3.integration.test.ts",
+    "test": "tsx --test src/services/reglasNegocio.test.ts src/services/colaPrioridad.test.ts src/controllers/descargaController.integration.test.ts src/services/sprint3.integration.test.ts src/services/mfa.test.ts src/middleware/verifyTempToken.test.ts src/services/sprint6y7.integration.test.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },
@@ -20,7 +20,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.10.0"
+    "mongoose": "^9.10.0",
+    "speakeasy": "^2.0.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -28,6 +29,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.20.2",
+    "@types/speakeasy": "^2.0.10",
     "tsx": "^4.23.13",
     "typescript": "^5.7.0"
   }

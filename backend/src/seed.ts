@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { Usuario } from './models/Usuario.js';
 import { Role, type RoleName } from './models/Role.js';
 import { Parametro } from './models/Parametro.js';
+import { aplicarMigraciones } from './services/migraciones.js';
 
 dotenv.config();
 
@@ -13,18 +14,9 @@ const crearUsuarioSemilla = async () => {
     await mongoose.connect(MONGO_URI);
     console.log('Conectado a MongoDB...');
 
-    const rolesBase: Array<{ nombre: RoleName; descripcion: string }> = [
-      { nombre: 'administrador', descripcion: 'Acceso total al sistema' },
-      { nombre: 'coordinador', descripcion: 'Gestion operativa y supervision' },
-      { nombre: 'operador', descripcion: 'Acceso limitado a operaciones diarias' },
-    ];
-
-    const roles = [];
-    for (const roleBase of rolesBase) {
-      const role = await Role.findOne({ nombre: roleBase.nombre }) ?? await Role.create(roleBase);
-      roles.push(role);
-    }
-    const rolesPorNombre = new Map(roles.map((role) => [role.nombre, role]));
+    await aplicarMigraciones();
+    const roles = await Role.find({ nombreRol: { $in: ['administrador', 'coordinador', 'operador'] } });
+    const rolesPorNombre = new Map(roles.map((role) => [role.nombreRol, role]));
 
     const parametrosHorario = [
       { clave: 'numero_equipo', valor: process.env.EQUIPO_NUMERO || '04', descripcion: 'Número del equipo para generar pedidos correlativos' },

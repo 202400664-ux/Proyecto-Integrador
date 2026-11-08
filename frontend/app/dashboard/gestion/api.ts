@@ -1,4 +1,4 @@
-import type { Categoria, DashboardKpis, DescargaActiva, Gateway, Notificacion, Pedido, Proveedor } from './types';
+import type { Categoria, DashboardKpis, DescargaActiva, Gateway, Notificacion, Pedido, Proveedor, RolCatalogo } from './types';
 import { obtenerNombreUsuarioActual } from '../auth';
 
 export const API_BASE_URL = 'http://localhost:4000/api';
@@ -49,7 +49,7 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
 
 export async function obtenerProveedores(categoria?: Categoria): Promise<Proveedor[]> {
   const query = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
-  const response = await fetch(`${API_BASE_URL}/proveedores${query}`);
+  const response = await fetch(`${API_BASE_URL}/proveedores${query}`, { headers: encabezadosAutenticados() });
   const data = await parseOrThrow<{ proveedores: Proveedor[] }>(response);
   return data.proveedores;
 }
@@ -118,7 +118,7 @@ export async function inactivarProveedor(id: string): Promise<void> {
 }
 
 export async function obtenerPedidos(): Promise<Pedido[]> {
-  const response = await fetch(`${API_BASE_URL}/pedidos`);
+  const response = await fetch(`${API_BASE_URL}/pedidos`, { headers: encabezadosAutenticados() });
   const data = await parseOrThrow<{ pedidos: Pedido[] }>(response);
   return data.pedidos;
 }
@@ -172,6 +172,28 @@ export async function registrarArribo(numeroPedido: string) {
 function headersConSesion(): HeadersInit {
   const token = localStorage.getItem('token');
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+export async function obtenerRoles(activo?: boolean): Promise<RolCatalogo[]> {
+  const query = activo === undefined ? '' : `?activo=${activo}`;
+  const response = await fetch(`${API_BASE_URL}/roles${query}`, { headers: headersConSesion() });
+  const data = await parseOrThrow<{ roles: RolCatalogo[] }>(response);
+  return data.roles;
+}
+
+export async function crearRol(rol: Pick<RolCatalogo, 'nombreRol' | 'descripcion' | 'permisos'>): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/roles`, { method: 'POST', headers: headersConSesion(), body: JSON.stringify(rol) });
+  await parseOrThrow(response);
+}
+
+export async function actualizarRol(id: string, cambios: Partial<Omit<RolCatalogo, '_id'>>): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/roles/${id}`, { method: 'PUT', headers: headersConSesion(), body: JSON.stringify(cambios) });
+  await parseOrThrow(response);
+}
+
+export async function desactivarRol(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/roles/${id}`, { method: 'DELETE', headers: headersConSesion() });
+  await parseOrThrow(response);
 }
 
 export async function obtenerDashboardKpis(): Promise<DashboardKpis> {

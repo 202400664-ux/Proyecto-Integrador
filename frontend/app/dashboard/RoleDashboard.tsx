@@ -1,39 +1,22 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
-import { jwtDecode } from 'jwt-decode';
-import { esRolValido, type Rol } from './permisos';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { leerSesionDeToken, tienePermiso, type Permiso } from './permisos';
 import { RolProvider } from './RolContext';
 import Sidebar, { type PestanaDashboard } from './gestion/components/Sidebar';
-
-interface DecodedToken {
-  rol: Rol;
-  exp: number;
-}
 
 const removeStoredSession = () => {
   localStorage.removeItem('token');
 };
 
-const getRoleLabel = (role: Rol) => role.charAt(0).toUpperCase() + role.slice(1);
+const getRoleLabel = (role: string) => role.charAt(0).toUpperCase() + role.slice(1);
 
-const readRoleFromToken = (): Rol | null => {
+const readValidToken = (): string | null => {
   if (typeof window === 'undefined') return null;
 
   const token = localStorage.getItem('token');
-  if (!token) return null;
-
-  try {
-    const decoded = jwtDecode<DecodedToken>(token);
-    if (!esRolValido(decoded.rol) || decoded.exp * 1000 <= Date.now()) {
-      return null;
-    }
-
-    return decoded.rol;
-  } catch {
-    return null;
-  }
+  return leerSesionDeToken(token) ? token : null;
 };
 
 const subscribeToSession = (callback: () => void) => {
@@ -46,7 +29,7 @@ const subscribeToSession = (callback: () => void) => {
 };
 
 const handleBackNavigation = (router: ReturnType<typeof useRouter>) => {
-  if (readRoleFromToken()) {
+  if (readValidToken()) {
     window.history.pushState(null, '', window.location.href);
   } else {
     router.replace('/');
@@ -55,6 +38,8 @@ const handleBackNavigation = (router: ReturnType<typeof useRouter>) => {
 
 interface RoleDashboardProps {
   children?: React.ReactNode;
+  /** Si se indica, la página solo muestra su contenido a quien tenga este permiso. */
+  requierePermiso?: Permiso;
 }
 
 /**
@@ -64,9 +49,12 @@ interface RoleDashboardProps {
  * componentes hijos limiten qué ACCIONES mostrar (ver permisos.ts),
  * en lugar de tener una pantalla completa por cada rol.
  */
-export default function RoleDashboard({ children }: RoleDashboardProps) {
-  const rol = useSyncExternalStore(subscribeToSession, readRoleFromToken, () => null);
+export default function RoleDashboard({ children, requierePermiso }: RoleDashboardProps) {
+  const tokenSesion = useSyncExternalStore(subscribeToSession, readValidToken, () => null);
+  const sesion = useMemo(() => leerSesionDeToken(tokenSesion), [tokenSesion]);
+  const rol = sesion?.rol ?? null;
   const router = useRouter();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pestanaActiva, setPestanaActiva] = useState<PestanaDashboard>('inicio');
   const [navegacionSeleccionada, setNavegacionSeleccionada] = useState(false);
@@ -74,9 +62,8 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const currentRole = readRoleFromToken();
 
-    if (!token || !currentRole) {
+    if (!token || !readValidToken()) {
       removeStoredSession();
       router.replace('/');
       return;
@@ -104,7 +91,25 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
 
     window.addEventListener('dashboard:show-home', onShowHome);
     window.addEventListener('dashboard:select-tab', onSelectTab as EventListener);
+    const requestedTab = new URLSearchParams(window.location.search).get('tab');
+    const validTabs: PestanaDashboard[] = [
+      'inicio',
+      'proveedores',
+      'pedidos',
+      'caseta',
+      'mantenimientos',
+      'auditoria',
+      'kpis',
+      'parametros',
+      'gateways',
+    ];
+    const timer = window.setTimeout(() => {
+      if (requestedTab && validTabs.includes(requestedTab as PestanaDashboard)) {
+        window.dispatchEvent(new CustomEvent('dashboard:select-tab', { detail: requestedTab }));
+      }
+    }, 0);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener('dashboard:show-home', onShowHome);
       window.removeEventListener('dashboard:select-tab', onSelectTab as EventListener);
     };
@@ -118,6 +123,12 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
   };
 
   const navegar = (pestana: PestanaDashboard) => {
+    if (pathname !== '/dashboard') {
+      router.push(`/dashboard?tab=${encodeURIComponent(pestana)}`);
+      setSidebarOpen(false);
+      return;
+    }
+
     setNavegacionSeleccionada(true);
     setPestanaActiva(pestana);
     if (pestana === 'inicio') {
@@ -127,10 +138,10 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
     }
   };
 
-  if (!rol) return null;
+  if (!sesion) return null;
 
   return (
-    <RolProvider rol={rol}>
+    <RolProvider sesion={sesion}>
       <div className="dashboard-shell">
         <header className="dashboard-topbar">
           <div className="dashboard-header-inner">
@@ -158,7 +169,7 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
             <div className="dashboard-user-panel">
               <div className="dashboard-user-meta">
                 <span className="dashboard-rol-label">Rol</span>
-                <strong>{getRoleLabel(rol)}</strong>
+                <strong>{sesion.roles.map(getRoleLabel).join(', ')}</strong>
               </div>
               <button onClick={handleLogout} className="dashboard-logout-btn">
                 Cerrar Sesión
@@ -169,14 +180,19 @@ export default function RoleDashboard({ children }: RoleDashboardProps) {
 
         <main className={`dashboard-main dashboard-layout ${sidebarOpen ? 'sidebar-expanded' : ''}`}>
           <Sidebar
-            rol={rol}
             abierto={sidebarOpen}
             pestanaActiva={pestanaVisible}
             onNavegar={navegar}
             onCerrar={() => setSidebarOpen(false)}
           />
 
-          <div className="dashboard-panel">{children}</div>
+          <div className="dashboard-panel">
+            {requierePermiso && !tienePermiso(sesion, requierePermiso) ? (
+              <div className="alert alert-danger" role="alert">
+                <strong>Acceso no autorizado.</strong> Sus roles no tienen habilitado este módulo.
+              </div>
+            ) : children}
+          </div>
         </main>
       </div>
     </RolProvider>

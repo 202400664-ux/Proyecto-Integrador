@@ -68,7 +68,7 @@ export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosF
           <input
             type="text"
             className="form-control form-control-lg"
-            placeholder="Ej. PED-1001"
+            placeholder="Ej. PED-EQUI04-000000001"
             value={numPedido}
             onChange={(e) => setNumPedido(e.target.value)}
             required

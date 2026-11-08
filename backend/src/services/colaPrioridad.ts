@@ -1,6 +1,8 @@
 import { Types } from 'mongoose';
 import { Gateway } from '../models/Gateway.js';
+import { Parametro } from '../models/Parametro.js';
 import { Pedido, type EstadoPedido, type TipoProducto } from '../models/Pedido.js';
+import { Proveedor } from '../models/Proveedor.js';
 import { registrarAuditoria } from '../controllers/auditoriaController.js';
 import { notificarRol } from './notificaciones.js';
 import { registrarEvento } from './eventos.js';
@@ -17,33 +19,44 @@ interface PedidoEnCola {
   tipoProducto: TipoProducto;
   estado: EstadoPedido;
   clasificacionPuntualidad?: 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO';
-  fechaEntradaCola?: Date;
+  fechaHoraProgramada?: Date;
+  fechaHoraIngresoCola?: Date;
+  minutosEnEspera?: number;
+  prioridadCalculada?: number;
 }
 
 const PRIORIDAD_PUNTUALIDAD: Partial<Record<EstadoPedido, number>> = {
-  'TARDÍO': 3,
-  'A TIEMPO': 2,
-  'ANTICIPADO': 1,
+  'A TIEMPO': 3,
+  'ANTICIPADO': 2,
+  'TARDÍO': 1,
 };
 
-const INTERVALO_AGING_MINUTOS = Math.max(1, Number(process.env.AGING_INTERVALO_MINUTOS) || 10);
+export const FACTOR_AGING_POR_DEFECTO = 10;
+export const LIMITE_ESPERA_POR_DEFECTO = 120;
 
-function puntuacion(pedido: PedidoEnCola, ahora: number): number {
-  const base = PRIORIDAD_PUNTUALIDAD[pedido.clasificacionPuntualidad ?? pedido.estado] ?? 0;
-  const espera = Math.max(0, ahora - new Date(pedido.fechaEntradaCola ?? ahora).getTime());
-  return base + Math.floor(espera / (INTERVALO_AGING_MINUTOS * 60_000));
+export function calcularMinutosEnEspera(pedido: PedidoEnCola, ahora: number): number {
+  const espera = ahora - new Date(pedido.fechaHoraIngresoCola ?? ahora).getTime();
+  return Math.max(0, Math.floor(espera / 60_000));
 }
 
-function precede(a: PedidoEnCola, b: PedidoEnCola, ahora: number): boolean {
-  const diferencia = puntuacion(a, ahora) - puntuacion(b, ahora);
+/** Prioridad base por puntualidad + 1 punto por cada factor_aging_min transcurridos en cola. */
+export function calcularPrioridad(pedido: PedidoEnCola, ahora: number, factorAgingMin: number): number {
+  const base = PRIORIDAD_PUNTUALIDAD[pedido.clasificacionPuntualidad ?? pedido.estado] ?? 0;
+  return base + Math.floor(calcularMinutosEnEspera(pedido, ahora) / factorAgingMin);
+}
+
+function precede(a: PedidoEnCola, b: PedidoEnCola, ahora: number, factorAgingMin: number): boolean {
+  const diferencia = calcularPrioridad(a, ahora, factorAgingMin) - calcularPrioridad(b, ahora, factorAgingMin);
   if (diferencia !== 0) return diferencia > 0;
-  return new Date(a.fechaEntradaCola ?? 0).getTime() < new Date(b.fechaEntradaCola ?? 0).getTime();
+  const programada = new Date(a.fechaHoraProgramada ?? 0).getTime() - new Date(b.fechaHoraProgramada ?? 0).getTime();
+  if (programada !== 0) return programada < 0;
+  return new Date(a.fechaHoraIngresoCola ?? 0).getTime() < new Date(b.fechaHoraIngresoCola ?? 0).getTime();
 }
 
 export class MaxHeapPedidos {
   private elementos: PedidoEnCola[] = [];
 
-  constructor(private readonly ahora = Date.now()) {}
+  constructor(private readonly ahora = Date.now(), private readonly factorAgingMin = FACTOR_AGING_POR_DEFECTO) {}
 
   get size(): number { return this.elementos.length; }
 
@@ -52,7 +65,7 @@ export class MaxHeapPedidos {
     let indice = this.elementos.length - 1;
     while (indice > 0) {
       const padre = Math.floor((indice - 1) / 2);
-      if (!precede(this.elementos[indice], this.elementos[padre], this.ahora)) break;
+      if (!precede(this.elementos[indice], this.elementos[padre], this.ahora, this.factorAgingMin)) break;
       [this.elementos[indice], this.elementos[padre]] = [this.elementos[padre], this.elementos[indice]];
       indice = padre;
     }
@@ -69,8 +82,8 @@ export class MaxHeapPedidos {
         const izquierdo = indice * 2 + 1;
         const derecho = izquierdo + 1;
         let mayor = indice;
-        if (izquierdo < this.elementos.length && precede(this.elementos[izquierdo], this.elementos[mayor], this.ahora)) mayor = izquierdo;
-        if (derecho < this.elementos.length && precede(this.elementos[derecho], this.elementos[mayor], this.ahora)) mayor = derecho;
+        if (izquierdo < this.elementos.length && precede(this.elementos[izquierdo], this.elementos[mayor], this.ahora, this.factorAgingMin)) mayor = izquierdo;
+        if (derecho < this.elementos.length && precede(this.elementos[derecho], this.elementos[mayor], this.ahora, this.factorAgingMin)) mayor = derecho;
         if (mayor === indice) break;
         [this.elementos[indice], this.elementos[mayor]] = [this.elementos[mayor], this.elementos[indice]];
         indice = mayor;
@@ -84,27 +97,94 @@ export class MaxHeapPedidos {
  * Pasa a la cola los pedidos ANTICIPADO cuya ventana ya inició (HU-02, escenario 2).
  * Conserva la clasificación original para el cálculo de prioridad.
  */
-export async function liberarAnticipados(ahora = new Date()): Promise<number> {
-  const resultado = await Pedido.updateMany(
-    { activo: true, estado: 'ANTICIPADO', inicioVentana: { $lte: ahora } },
-    { $set: { estado: 'EN_COLA', clasificacionPuntualidad: 'ANTICIPADO', fechaEntradaCola: ahora, usuarioActualizacion: 'Motor EDA 0' } }
-  );
-  return resultado.modifiedCount;
+export async function liberarAnticipados(actor: ActorOperativo, ahora = new Date()): Promise<number> {
+  const pendientes = await Pedido.find({ activo: true, estado: 'ANTICIPADO', inicioVentana: { $lte: ahora } }).select('_id');
+  let liberados = 0;
+  for (const { _id } of pendientes) {
+    // El filtro por estado evita liberar (y auditar) dos veces con peticiones simultáneas.
+    const pedido = await Pedido.findOneAndUpdate(
+      { _id, activo: true, estado: 'ANTICIPADO' },
+      { $set: {
+        estado: 'EN COLA',
+        clasificacionPuntualidad: 'ANTICIPADO',
+        fechaHoraIngresoCola: ahora,
+        minutosEnEspera: 0,
+        prioridadCalculada: PRIORIDAD_PUNTUALIDAD.ANTICIPADO,
+        usuarioActualizacion: 'Motor EDA 0',
+      } },
+      { returnDocument: 'after' }
+    );
+    if (!pedido) continue;
+    liberados += 1;
+    await registrarEvento({
+      usuarioId: actor.id,
+      usuario: actor.nombreCompleto,
+      accion: 'INGRESO_COLA',
+      pedidoId: String(pedido._id),
+      detalles: { numeroPedido: pedido.numeroPedido, clasificacionPuntualidad: 'ANTICIPADO', prioridadCalculada: pedido.prioridadCalculada, origen: 'inicio de ventana' },
+    });
+  }
+  return liberados;
+}
+
+async function leerParametroCola(clave: string, porDefecto: number): Promise<number> {
+  const parametro = await Parametro.findOne({ clave, activo: true });
+  const valor = Number(parametro?.valor);
+  return Number.isFinite(valor) && valor >= 1 ? valor : porDefecto;
+}
+
+/**
+ * Libera anticipados y persiste minutosEnEspera y prioridadCalculada de los
+ * pedidos en cola; cada subida de prioridad por envejecimiento queda en eventos.
+ */
+async function sincronizarCola(actor: ActorOperativo) {
+  await liberarAnticipados(actor);
+  const [factorAgingMin, limiteEsperaMax] = await Promise.all([
+    leerParametroCola('factor_aging_min', FACTOR_AGING_POR_DEFECTO),
+    leerParametroCola('limite_espera_max', LIMITE_ESPERA_POR_DEFECTO),
+  ]);
+  const pedidos = await Pedido.find({ activo: true, estado: 'EN COLA' })
+    .populate({ path: 'proveedorId', model: Proveedor, select: 'razonSocial categoria' })
+    .sort({ fechaHoraIngresoCola: 1 })
+    .lean<PedidoEnCola[]>();
+  const ahora = Date.now();
+
+  for (const pedido of pedidos) {
+    const minutosEnEspera = calcularMinutosEnEspera(pedido, ahora);
+    const prioridadCalculada = calcularPrioridad(pedido, ahora, factorAgingMin);
+    const prioridadAnterior = pedido.prioridadCalculada;
+    if (minutosEnEspera === pedido.minutosEnEspera && prioridadCalculada === prioridadAnterior) continue;
+
+    // Se condiciona a la prioridad leída para que solo una petición simultánea audite el cambio.
+    const { modifiedCount } = await Pedido.updateOne(
+      { _id: pedido._id, estado: 'EN COLA', prioridadCalculada: prioridadAnterior ?? null },
+      { $set: { minutosEnEspera, prioridadCalculada } },
+      { timestamps: false }
+    );
+    pedido.minutosEnEspera = minutosEnEspera;
+    pedido.prioridadCalculada = prioridadCalculada;
+    if (modifiedCount === 1 && prioridadAnterior !== undefined && prioridadCalculada > prioridadAnterior) {
+      await registrarEvento({
+        usuarioId: actor.id,
+        usuario: actor.nombreCompleto,
+        accion: 'AGING_APLICADO',
+        pedidoId: String(pedido._id),
+        detalles: { numeroPedido: pedido.numeroPedido, prioridadAnterior, prioridadCalculada, minutosEnEspera, factorAgingMin },
+      });
+    }
+  }
+  return { pedidos, ahora, factorAgingMin, limiteEsperaMax };
 }
 
 export async function reevaluarCola(actor: ActorOperativo): Promise<void> {
-  await liberarAnticipados();
-  const pedidos = await Pedido.find({ activo: true, estado: 'EN_COLA' })
-    .sort({ fechaEntradaCola: 1 })
-    .lean<PedidoEnCola[]>();
+  const { pedidos, ahora, factorAgingMin } = await sincronizarCola(actor);
   if (!pedidos.length) return;
 
   const gateways = await Gateway.find({ activo: true, estado: 'LIBRE', pedidoAsignadoId: { $exists: false } })
     .sort({ numeroGateway: 1 });
-  const ahora = Date.now();
 
   for (const gateway of gateways) {
-    const heap = new MaxHeapPedidos(ahora);
+    const heap = new MaxHeapPedidos(ahora, factorAgingMin);
     for (const pedido of pedidos) {
       if (validarCompatibilidadBahia(gateway, pedido.tipoProducto)) heap.push(pedido);
     }
@@ -119,8 +199,8 @@ export async function reevaluarCola(actor: ActorOperativo): Promise<void> {
     if (!reserva) continue;
 
     const asignado = await Pedido.findOneAndUpdate(
-      { _id: candidato._id, activo: true, estado: 'EN_COLA' },
-      { $set: { estado: 'GATEWAY_ASIGNADO', gatewayId: gateway._id, usuarioActualizacion: 'Motor EDA 0' } },
+      { _id: candidato._id, activo: true, estado: 'EN COLA' },
+      { $set: { estado: 'GATEWAY ASIGNADO', gatewayId: gateway._id, usuarioActualizacion: 'Motor EDA 0' } },
       { returnDocument: 'after' }
     );
     if (!asignado) {
@@ -132,14 +212,19 @@ export async function reevaluarCola(actor: ActorOperativo): Promise<void> {
       await registrarEvento({
         usuarioId: actor.id,
         usuario: actor.nombreCompleto,
-        accion: 'GATEWAY_ASIGNADO',
+        accion: 'PROMOCION_AUTOMATICA_GATEWAY',
         pedidoId: String(asignado._id),
-        detalles: { numeroPedido: asignado.numeroPedido, numeroGateway: gateway.numeroGateway },
+        detalles: {
+          numeroPedido: asignado.numeroPedido,
+          numeroGateway: gateway.numeroGateway,
+          prioridadCalculada: candidato.prioridadCalculada,
+          minutosEnEspera: candidato.minutosEnEspera,
+        },
       });
     } catch (error) {
       await Pedido.updateOne(
-        { _id: asignado._id, estado: 'GATEWAY_ASIGNADO', gatewayId: gateway._id },
-        { $set: { estado: 'EN_COLA', usuarioActualizacion: actor.nombreCompleto }, $unset: { gatewayId: 1 } }
+        { _id: asignado._id, estado: 'GATEWAY ASIGNADO', gatewayId: gateway._id },
+        { $set: { estado: 'EN COLA', usuarioActualizacion: actor.nombreCompleto }, $unset: { gatewayId: 1 } }
       );
       await Gateway.updateOne(
         { _id: gateway._id, pedidoAsignadoId: asignado._id },
@@ -173,25 +258,40 @@ export async function encolarPedido(pedidoId: string, actor: ActorOperativo): Pr
     throw new Error('El pedido debe tener una llegada clasificada para entrar a la cola');
   }
 
+  const estadoAnterior = pedido.estado;
   pedido.clasificacionPuntualidad = pedido.estado as 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO';
-  pedido.estado = 'EN_COLA';
-  pedido.fechaEntradaCola = new Date();
+  pedido.fechaHoraIngresoCola = new Date();
+  pedido.minutosEnEspera = 0;
+  pedido.prioridadCalculada = PRIORIDAD_PUNTUALIDAD[pedido.clasificacionPuntualidad];
+  pedido.estado = 'EN COLA';
   pedido.gatewayId = undefined;
   await pedido.save();
+  try {
+    await registrarEvento({
+      usuarioId: actor.id,
+      usuario: actor.nombreCompleto,
+      accion: 'INGRESO_COLA',
+      pedidoId: String(pedido._id),
+      detalles: { numeroPedido: pedido.numeroPedido, clasificacionPuntualidad: pedido.clasificacionPuntualidad, prioridadCalculada: pedido.prioridadCalculada },
+    });
+  } catch (error) {
+    pedido.estado = estadoAnterior;
+    await pedido.save();
+    throw error;
+  }
   await registrarAuditoria({ entidad: 'Cola', accion: 'ingresar', detalle: `Pedido ${pedido.numeroPedido} ingresó a la cola`, usuario: actor.nombreCompleto });
   await reevaluarCola(actor);
   return Pedido.findById(pedido._id).populate('gatewayId');
 }
 
-export async function listarColaPrioridad(): Promise<PedidoEnCola[]> {
-  await liberarAnticipados();
-  const pedidos = await Pedido.find({ activo: true, estado: 'EN_COLA' }).lean<PedidoEnCola[]>();
-  const heap = new MaxHeapPedidos();
+export async function listarColaPrioridad(actor: ActorOperativo): Promise<Array<PedidoEnCola & { excedeLimiteEspera: boolean }>> {
+  const { pedidos, ahora, factorAgingMin, limiteEsperaMax } = await sincronizarCola(actor);
+  const heap = new MaxHeapPedidos(ahora, factorAgingMin);
   pedidos.forEach((pedido) => heap.push(pedido));
-  const ordenados: PedidoEnCola[] = [];
+  const ordenados: Array<PedidoEnCola & { excedeLimiteEspera: boolean }> = [];
   while (heap.size) {
     const siguiente = heap.pop();
-    if (siguiente) ordenados.push(siguiente);
+    if (siguiente) ordenados.push({ ...siguiente, excedeLimiteEspera: (siguiente.minutosEnEspera ?? 0) >= limiteEsperaMax });
   }
   return ordenados;
 }

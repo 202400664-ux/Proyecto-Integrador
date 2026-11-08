@@ -59,6 +59,7 @@ body {
 }
 
 .dashboard-menu-button {
+  display: none;
   width: 2.8rem;
   height: 2.8rem;
   border: 1px solid rgba(241, 189, 75, 0.35);
@@ -71,6 +72,12 @@ body {
   gap: 0.28rem;
   padding: 0.55rem;
   flex-shrink: 0;
+}
+
+@media (min-width: 901px) {
+  .dashboard-brand-block > .dashboard-menu-button {
+    display: none !important;
+  }
 }
 
 .dashboard-menu-button span {
@@ -162,10 +169,6 @@ body {
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.dashboard-layout.sidebar-expanded {
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 1.5rem;
   align-items: start;
@@ -190,6 +193,12 @@ body {
 
 .dashboard-sidebar.closed {
   display: none;
+}
+
+@media (min-width: 901px) {
+  .dashboard-sidebar.closed {
+    display: flex;
+  }
 }
 
 .dashboard-sidebar-header {
@@ -378,6 +387,10 @@ body {
 
 .dashboard-panel .btn-primary:hover {
   background: linear-gradient(135deg, #1a6d9b, #0f2c42);
+}
+
+.dashboard-panel .user-management .btn {
+  border-radius: 0.8rem;
 }
 
 .pedido-form-actions {
@@ -889,6 +902,10 @@ body {
     align-items: flex-start;
   }
 
+  .dashboard-menu-button {
+    display: inline-flex;
+  }
+
   .dashboard-title-wrap h1 {
     font-size: clamp(1.15rem, 6vw, 1.7rem);
   }
@@ -906,7 +923,7 @@ body {
     padding: 1rem;
   }
 
-  .dashboard-layout.sidebar-expanded {
+  .dashboard-layout {
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }
@@ -1112,4 +1129,100 @@ body {
   .login-panel {
     padding: 2rem 1.5rem 3rem;
   }
+}
+
+
+.cola-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cola-card {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(18, 49, 73, 0.1);
+  border-top: 4px solid #7c8790;
+  border-radius: 0.8rem;
+  background: #fff;
+  padding: 1rem;
+}
+
+.cola-card-siguiente {
+  border-top-color: #1d78a8;
+  box-shadow: 0 0.35rem 1rem rgba(18, 49, 73, 0.12);
+}
+
+.cola-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cola-posicion {
+  display: grid;
+  flex: 0 0 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #123149;
+  color: #fff;
+  font-weight: 800;
+}
+
+.cola-card-titulo {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.cola-card-titulo strong {
+  color: #123149;
+  overflow-wrap: anywhere;
+}
+
+.cola-card-titulo span {
+  color: #59636b;
+  font-size: 0.9rem;
+}
+
+.cola-prioridad {
+  display: grid;
+  justify-items: end;
+  line-height: 1.1;
+}
+
+.cola-prioridad small {
+  color: #59636b;
+}
+
+.cola-prioridad strong {
+  color: #123149;
+  font-size: 1.5rem;
+}
+
+.cola-datos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.cola-datos dt {
+  color: #59636b;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.cola-datos dd {
+  margin: 0;
+  color: #123149;
+  font-weight: 600;
+}
+
+.rol-nombre::first-letter {
+  text-transform: uppercase;
 }

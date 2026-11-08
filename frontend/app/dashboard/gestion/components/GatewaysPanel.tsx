@@ -29,13 +29,11 @@ const claseEstado: Record<Gateway['estado'], string> = {
   'FUERA DE SERVICIO': 'gateway-offline',
 };
 
-type PedidoEnCola = Pedido & { minutosEnCola: number | null };
-
 export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: GatewaysPanelProps) {
   const [gateways, setGateways] = useState<Gateway[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [gatewaysInactivos, setGatewaysInactivos] = useState<Gateway[]>([]);
-  const [cola, setCola] = useState<PedidoEnCola[]>([]);
+  const [cola, setCola] = useState<Pedido[]>([]);
   const [descargas, setDescargas] = useState<DescargaActiva[]>([]);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -57,13 +55,7 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
       ]);
       setGateways(listaGateways);
       setPedidos(listaPedidos);
-      const ahora = Date.now();
-      setCola(listaCola.map((pedido) => ({
-        ...pedido,
-        minutosEnCola: pedido.fechaEntradaCola
-          ? Math.floor((ahora - new Date(pedido.fechaEntradaCola).getTime()) / 60000)
-          : null,
-      })));
+      setCola(listaCola);
       setDescargas(listaDescargas);
       setGatewaysInactivos(listaInactivos);
       setNotificaciones(listaNotificaciones);
@@ -172,7 +164,7 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
                 <div className="gateway-assignment">
                   <span className="small text-uppercase fw-bold">Pedido asignado</span>
                   <strong>{asignado.numeroPedido}</strong>
-                  <span>{asignado.tipoProducto} · {asignado.estado.replaceAll('_', ' ')}</span>
+                  <span>{asignado.tipoProducto} · {asignado.estado}</span>
                 </div>
               ) : gateway.estado === 'OCUPADO' ? (
                 <div className="gateway-assignment">
@@ -288,7 +280,7 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
         <div className="d-flex align-items-center justify-content-between gap-3 mb-3">
           <div>
             <h3 className="h5 mb-1">Cola de prioridad</h3>
-            <p className="small text-secondary mb-0">Ordenada por puntualidad y tiempo de espera con aging.</p>
+            <p className="small text-secondary mb-0">Ordenada por prioridad calculada: puntualidad, hora programada y aging.</p>
           </div>
           <span className="badge text-bg-secondary">{cola.length} en espera</span>
         </div>
@@ -297,15 +289,16 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
         ) : (
           <div className="table-responsive">
             <table className="table align-middle mb-0">
-              <thead><tr><th>Prioridad</th><th>Pedido</th><th>Tipo de carga</th><th>Clasificación</th><th>Espera</th></tr></thead>
+              <thead><tr><th>Posición</th><th>Pedido</th><th>Tipo de carga</th><th>Clasificación</th><th>Prioridad</th><th>Espera</th></tr></thead>
               <tbody>
                 {cola.map((pedido, index) => (
                   <tr key={pedido._id}>
                     <td><span className="badge text-bg-dark">{index + 1}</span></td>
                     <td className="fw-semibold">{pedido.numeroPedido}</td>
                     <td>{pedido.tipoProducto}</td>
-                    <td>{pedido.estado}</td>
-                    <td>{pedido.minutosEnCola === null ? '—' : `${pedido.minutosEnCola} min`}</td>
+                    <td>{pedido.clasificacionPuntualidad ?? '—'}</td>
+                    <td>{pedido.prioridadCalculada ?? '—'}</td>
+                    <td>{pedido.minutosEnEspera === undefined ? '—' : `${pedido.minutosEnEspera} min`}</td>
                   </tr>
                 ))}
               </tbody>

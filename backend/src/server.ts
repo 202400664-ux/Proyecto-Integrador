@@ -12,11 +12,14 @@ import parametrosRoutes from './routes/parametros.js';
 import gatewaysRoutes from './routes/gateways.js';
 import colaRoutes from './routes/cola.js';
 import descargasRoutes from './routes/descargas.js';
+import rolesRoutes from './routes/roles.js';
 import { inicializarGateways } from './controllers/gatewayController.js';
-import { autenticar, requiereRol } from './middleware/autenticacion.js';
+import { aplicarMigraciones } from './services/migraciones.js';
 import notificacionesRoutes from './routes/notificaciones.js';
 import eventosRoutes from './routes/eventos.js';
 import dashboardRoutes from './routes/dashboard.js';
+import mfaRoutes from './routes/mfaRoutes.js';
+import usuariosRoutes from './routes/usuariosRoutes.js';
 
 dotenv.config();
 
@@ -31,6 +34,7 @@ app.use(express.json());
 mongoose
   .connect(MONGO_URI)
   .then(async () => {
+    await aplicarMigraciones();
     await inicializarGateways();
     console.log('✅ Conectado a MongoDB correctamente');
   })
@@ -38,9 +42,12 @@ mongoose
 
 // 2. Registrar las rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/mfa', mfaRoutes);
+app.use('/api/mfa', mfaRoutes);
+app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/proveedores', proveedoresRoutes);
 app.use('/api/pedidos', pedidosRoutes);
-app.use('/api/llegadas', autenticar, requiereRol('administrador', 'coordinador', 'operador'), llegadasRoutes);
+app.use('/api/llegadas', llegadasRoutes);
 app.use('/api/mantenimientos', mantenimientosRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/parametros', parametrosRoutes);
@@ -50,6 +57,7 @@ app.use('/api/descargas', descargasRoutes);
 app.use('/api/notificaciones', notificacionesRoutes);
 app.use('/api/eventos', eventosRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/roles', rolesRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor backend corriendo en el puerto ${PORT}`);
