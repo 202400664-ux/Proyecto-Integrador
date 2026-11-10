@@ -35,7 +35,7 @@ test('iniciar y finalizar descarga mantiene pedido y gateway consistentes', { sk
       inicioVentana: new Date(),
       finVentana: new Date(Date.now() + 60_000),
       duracionEstimadaMinutos: 1,
-      estado: 'GATEWAY_ASIGNADO',
+      estado: 'GATEWAY ASIGNADO',
       gatewayId: gateway._id,
       activo: true,
       usuarioCreacion: 'Prueba',
@@ -114,7 +114,7 @@ test('iniciar y finalizar descarga mantiene pedido y gateway consistentes', { sk
       inicioVentana: new Date(),
       finVentana: new Date(Date.now() + 60_000),
       duracionEstimadaMinutos: 1,
-      estado: 'GATEWAY_ASIGNADO',
+      estado: 'GATEWAY ASIGNADO',
       gatewayId: gatewayLibreAsignado._id,
       activo: true,
       usuarioCreacion: 'Prueba',
@@ -128,7 +128,7 @@ test('iniciar y finalizar descarga mantiene pedido y gateway consistentes', { sk
     );
     assert.equal(inactivarAsignadoResponse.statusCode, 200, JSON.stringify(inactivarAsignadoResponse.body));
     const pedidoDevueltoACola = await Pedido.findById(pedidoEnGateway._id);
-    assert.ok(['EN_COLA', 'GATEWAY_ASIGNADO'].includes(pedidoDevueltoACola?.estado ?? ''));
+    assert.ok(['EN COLA', 'GATEWAY ASIGNADO'].includes(pedidoDevueltoACola?.estado ?? ''));
     assert.notEqual(String(pedidoDevueltoACola?.gatewayId), String(gatewayLibreAsignado._id));
 
     const gatewayOcupado = await Gateway.create({

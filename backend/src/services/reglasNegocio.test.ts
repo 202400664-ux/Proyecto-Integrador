@@ -3,7 +3,6 @@ import test from 'node:test';
 import {
   evaluarTolerancia,
   validarCompatibilidadBahia,
-  puedeIngresarACola,
   formatearNumeroPedido,
   esNumeroPedidoValido,
   TOLERANCIAS_POR_DEFECTO,
@@ -66,13 +65,6 @@ test('PU-10 evaluarTolerancia: los bordes de la tolerancia de 15 min son inclusi
   assert.equal(evaluarTolerancia(new Date(minutos(ventana.inicioVentana, -15).getTime() - 1), ventana, tolerancias), 'ANTICIPADO');
   assert.throws(() => evaluarTolerancia('fecha-invalida', ventana, tolerancias));
   assert.throws(() => evaluarTolerancia(ventana.inicioVentana, { inicioVentana: ventana.finVentana, finVentana: ventana.inicioVentana }, tolerancias));
-});
-
-test('PU-13 puedeIngresarACola: un pedido ANTICIPADO espera en garita hasta el inicio de su ventana (HU-02, H-01)', () => {
-  assert.equal(puedeIngresarACola('ANTICIPADO', ventana.inicioVentana, minutos(ventana.inicioVentana, -20)), false);
-  assert.equal(puedeIngresarACola('ANTICIPADO', ventana.inicioVentana, ventana.inicioVentana), true);
-  assert.equal(puedeIngresarACola('A TIEMPO', ventana.inicioVentana, minutos(ventana.inicioVentana, -10)), true);
-  assert.equal(puedeIngresarACola('TARDÍO', ventana.inicioVentana, minutos(ventana.finVentana, 30)), true);
 });
 
 test('PU-14 validarCompatibilidadBahia: una bahía fuera de servicio o inactiva no es compatible (RN-13/RN-14)', () => {

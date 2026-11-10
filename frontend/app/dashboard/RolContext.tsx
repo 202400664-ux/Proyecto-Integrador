@@ -1,17 +1,17 @@
 'use client';
 
 import { createContext, useContext } from 'react';
-import { tienePermiso, type Permiso, type Rol } from './permisos';
+import { tienePermiso, type Permiso, type Sesion } from './permisos';
 
 interface RolContextValue {
-  rol: Rol | null;
+  rol: string | null;
   puede: (permiso: Permiso) => boolean;
 }
 
 const RolContext = createContext<RolContextValue>({ rol: null, puede: () => false });
 
-export function RolProvider({ rol, children }: { rol: Rol | null; children: React.ReactNode }) {
-  const value: RolContextValue = { rol, puede: (permiso) => tienePermiso(rol, permiso) };
+export function RolProvider({ sesion, children }: { sesion: Sesion | null; children: React.ReactNode }) {
+  const value: RolContextValue = { rol: sesion?.rol ?? null, puede: (permiso) => tienePermiso(sesion, permiso) };
   return <RolContext.Provider value={value}>{children}</RolContext.Provider>;
 }
 

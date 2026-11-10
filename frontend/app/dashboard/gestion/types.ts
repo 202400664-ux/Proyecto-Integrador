@@ -1,3 +1,5 @@
+import type { Modulo } from '../permisos';
+
 export type Categoria = 'construcción' | 'general';
 
 export interface Proveedor {
@@ -27,11 +29,22 @@ export interface Pedido {
   inicioVentana: string;
   finVentana: string;
   duracionEstimadaMinutos: number;
-  estado: 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'EN_COLA' | 'GATEWAY_ASIGNADO' | 'DESCARGANDO' | 'FINALIZADO' | 'CANCELADO';
+  estado: 'PROGRAMADO' | 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO' | 'AUSENTE' | 'EN COLA' | 'GATEWAY ASIGNADO' | 'DESCARGANDO' | 'FINALIZADO' | 'CANCELADO';
   clasificacionPuntualidad?: 'ANTICIPADO' | 'A TIEMPO' | 'TARDÍO';
   fechaHoraLlegadaReal?: string;
   gatewayId?: string | GatewayRef;
-  fechaEntradaCola?: string;
+  fechaHoraIngresoCola?: string;
+  minutosEnEspera?: number;
+  prioridadCalculada?: number;
+  excedeLimiteEspera?: boolean;
+}
+
+export interface RolCatalogo {
+  _id: string;
+  nombreRol: string;
+  descripcion: string;
+  permisos: Modulo[];
+  activo: boolean;
 }
 
 export interface GatewayRef {
