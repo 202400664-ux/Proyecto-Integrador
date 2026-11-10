@@ -579,6 +579,10 @@ body {
   gap: 0.7rem;
 }
 
+.gateway-card-head > div {
+  min-width: 0;
+}
+
 .gateway-card-head h3 {
   margin: 0.25rem 0 0;
   color: #123149;
@@ -594,13 +598,17 @@ body {
 }
 
 .gateway-state {
+  flex-shrink: 1;
+  max-width: 55%;
   border-radius: 999px;
   background: rgba(59, 155, 104, 0.12);
   color: #247347;
   padding: 0.3rem 0.55rem;
   font-size: 0.68rem;
   font-weight: 800;
-  white-space: nowrap;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
 }
 
 .gateway-busy .gateway-state {

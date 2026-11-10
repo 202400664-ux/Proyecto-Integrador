@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import colaRoutes from '../routes/cola.js';
 import descargasRoutes from '../routes/descargas.js';
+import llegadasRoutes from '../routes/llegadas.js';
 import proveedoresRoutes from '../routes/proveedores.js';
 import rolesRoutes from '../routes/roles.js';
 import usuariosRoutes from '../routes/usuariosRoutes.js';
@@ -78,6 +79,7 @@ test('Sprint 6 y 7: catálogo de roles, permisos y cola con aging', { skip: !mon
   app.use('/api/proveedores', proveedoresRoutes);
   app.use('/api/cola', colaRoutes);
   app.use('/api/descargas', descargasRoutes);
+  app.use('/api/llegadas', llegadasRoutes);
   server = app.listen(0);
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 
@@ -206,6 +208,30 @@ test('Sprint 6 y 7: catálogo de roles, permisos y cola con aging', { skip: !mon
       assert.equal(promovido?.estado, 'GATEWAY ASIGNADO');
       assert.equal(String(promovido?.gatewayId), String(gatewaysOcupados[0]._id));
       assert.equal(await Evento.countDocuments({ accion: 'PROMOCION_AUTOMATICA_GATEWAY' }), 1);
+    });
+
+    await t.test('ingresa una llegada anticipada a la cola y conserva su prioridad', async () => {
+      const proveedor = await Proveedor.create({
+        razonSocial: 'Proveedor Construcción', identificacionTributaria: '654321', categoria: 'construcción', contactoNombre: 'Luis', telefono: '2222-4444', emailContacto: 'construccion@b.cd',
+      });
+      const inicioVentana = new Date(Date.now() + 60 * 60_000);
+      const pedido = await Pedido.create({
+        numeroPedido: 'ANTICIPADO-COLA',
+        proveedorId: proveedor._id,
+        tipoProducto: 'construcción',
+        fechaHoraProgramada: inicioVentana,
+        inicioVentana,
+        finVentana: new Date(inicioVentana.getTime() + 60 * 60_000),
+        duracionEstimadaMinutos: 60,
+      });
+
+      const llegada = await peticion('POST', '/llegadas', operador.token, { numeroPedido: pedido.numeroPedido });
+      assert.equal(llegada.status, 200);
+      assert.equal(llegada.body.estadoCalculado, 'ANTICIPADO');
+      assert.equal(llegada.body.pedido.estado, 'GATEWAY ASIGNADO');
+      assert.equal(llegada.body.pedido.prioridadCalculada, 2);
+      assert.equal(llegada.body.pedido.gatewayId.numeroGateway, 5);
+      assert.equal(await Evento.countDocuments({ accion: 'INGRESO_COLA', pedidoId: pedido._id }), 1);
     });
   } finally {
     server.close();

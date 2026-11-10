@@ -9,9 +9,29 @@ interface CasetaArribosFormProps {
 
 interface ResultadoArribo {
   estadoCalculado: string;
+  advertencia?: string;
   pedido: {
     fechaHoraLlegadaReal: string;
+    estado: string;
+    gatewayId?: string | { numeroGateway: number };
   };
+}
+
+function mensajeEstadoCola(resultado: ResultadoArribo): string {
+  const { pedido } = resultado;
+  if (pedido.estado === 'GATEWAY ASIGNADO') {
+    const numeroGateway = typeof pedido.gatewayId === 'object' ? pedido.gatewayId.numeroGateway : undefined;
+    return numeroGateway
+      ? `El pedido fue asignado automáticamente al Gateway ${numeroGateway} según su prioridad y tipo de carga.`
+      : 'El pedido fue asignado automáticamente a un gateway compatible.';
+  }
+  if (pedido.estado === 'EN COLA') {
+    return 'El pedido se agregó automáticamente a la cola. Se asignará cuando haya una bahía compatible disponible.';
+  }
+  if (pedido.estado === 'ANTICIPADO') {
+    return 'El pedido se clasificó como anticipado y se está procesando su ingreso a la cola con esa prioridad.';
+  }
+  return '';
 }
 
 // 2. Recibir la prop en el componente
@@ -94,6 +114,11 @@ export default function CasetaArribosForm({ onArriboRegistrado }: CasetaArribosF
             <div className="caseta-result-meta">
               <strong>Hora de llegada:</strong> {new Date(resultado.pedido.fechaHoraLlegadaReal).toLocaleTimeString()}
             </div>
+            {resultado.advertencia ? (
+              <div className="alert alert-warning mt-3 mb-0" role="status">{resultado.advertencia}</div>
+            ) : mensajeEstadoCola(resultado) ? (
+              <p className="mt-3 mb-0">{mensajeEstadoCola(resultado)}</p>
+            ) : null}
           </div>
         )}
       </div>

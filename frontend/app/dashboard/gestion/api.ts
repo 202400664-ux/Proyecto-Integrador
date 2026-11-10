@@ -262,15 +262,6 @@ export async function obtenerNotificaciones(): Promise<Notificacion[]> {
   return data.notificaciones;
 }
 
-export async function encolarPedido(pedidoId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/cola/asignar`, {
-    method: 'POST',
-    headers: headersConSesion(),
-    body: JSON.stringify({ pedidoId }),
-  });
-  await parseOrThrow(response);
-}
-
 export async function reevaluarColaPrioridad(): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/cola/reevaluar`, {
     method: 'POST',

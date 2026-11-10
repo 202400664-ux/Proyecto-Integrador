@@ -94,11 +94,11 @@ export class MaxHeapPedidos {
 }
 
 /**
- * Pasa a la cola los pedidos ANTICIPADO cuya ventana ya inició (HU-02, escenario 2).
- * Conserva la clasificación original para el cálculo de prioridad.
+ * Recupera pedidos ANTICIPADO que no llegaron a encolarse durante el registro.
+ * Conserva la clasificación original para que mantengan su prioridad.
  */
-export async function liberarAnticipados(actor: ActorOperativo, ahora = new Date()): Promise<number> {
-  const pendientes = await Pedido.find({ activo: true, estado: 'ANTICIPADO', inicioVentana: { $lte: ahora } }).select('_id');
+export async function incorporarAnticipados(actor: ActorOperativo, ahora = new Date()): Promise<number> {
+  const pendientes = await Pedido.find({ activo: true, estado: 'ANTICIPADO' }).select('_id');
   let liberados = 0;
   for (const { _id } of pendientes) {
     // El filtro por estado evita liberar (y auditar) dos veces con peticiones simultáneas.
@@ -121,7 +121,7 @@ export async function liberarAnticipados(actor: ActorOperativo, ahora = new Date
       usuario: actor.nombreCompleto,
       accion: 'INGRESO_COLA',
       pedidoId: String(pedido._id),
-      detalles: { numeroPedido: pedido.numeroPedido, clasificacionPuntualidad: 'ANTICIPADO', prioridadCalculada: pedido.prioridadCalculada, origen: 'inicio de ventana' },
+      detalles: { numeroPedido: pedido.numeroPedido, clasificacionPuntualidad: 'ANTICIPADO', prioridadCalculada: pedido.prioridadCalculada, origen: 'reevaluación de cola' },
     });
   }
   return liberados;
@@ -138,7 +138,7 @@ async function leerParametroCola(clave: string, porDefecto: number): Promise<num
  * pedidos en cola; cada subida de prioridad por envejecimiento queda en eventos.
  */
 async function sincronizarCola(actor: ActorOperativo) {
-  await liberarAnticipados(actor);
+  await incorporarAnticipados(actor);
   const [factorAgingMin, limiteEsperaMax] = await Promise.all([
     leerParametroCola('factor_aging_min', FACTOR_AGING_POR_DEFECTO),
     leerParametroCola('limite_espera_max', LIMITE_ESPERA_POR_DEFECTO),

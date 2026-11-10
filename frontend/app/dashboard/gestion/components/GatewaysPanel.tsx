@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   cambiarEstadoGateway,
-  encolarPedido,
   finalizarDescarga,
   inactivarGateway,
   iniciarDescarga,
@@ -12,7 +11,6 @@ import {
   obtenerGateways,
   obtenerGatewaysInactivos,
   obtenerNotificaciones,
-  obtenerPedidos,
   reevaluarColaPrioridad,
   reactivarGateway,
 } from '../api';
@@ -31,30 +29,26 @@ const claseEstado: Record<Gateway['estado'], string> = {
 
 export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: GatewaysPanelProps) {
   const [gateways, setGateways] = useState<Gateway[]>([]);
-  const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [gatewaysInactivos, setGatewaysInactivos] = useState<Gateway[]>([]);
   const [cola, setCola] = useState<Pedido[]>([]);
   const [descargas, setDescargas] = useState<DescargaActiva[]>([]);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState('');
-  const [pedidoPorGateway, setPedidoPorGateway] = useState<Record<string, string>>({});
   const [actualizando, setActualizando] = useState(false);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
 
   const cargar = useCallback(async () => {
     try {
-      const [listaGateways, listaCola, listaDescargas, listaInactivos, listaNotificaciones, listaPedidos] = await Promise.all([
+      const [listaGateways, listaCola, listaDescargas, listaInactivos, listaNotificaciones] = await Promise.all([
         obtenerGateways(),
         obtenerColaPrioridad(),
         obtenerDescargasActivas(),
         puedeAdministrar ? obtenerGatewaysInactivos() : Promise.resolve([]),
         obtenerNotificaciones(),
-        obtenerPedidos(),
       ]);
       setGateways(listaGateways);
-      setPedidos(listaPedidos);
       setCola(listaCola);
       setDescargas(listaDescargas);
       setGatewaysInactivos(listaInactivos);
@@ -113,7 +107,7 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
         <div>
           <p className="text-uppercase small fw-bold mb-1 text-warning">Operación de patio</p>
           <h2 className="h4 mb-1">Gateways de descarga</h2>
-          <p className="text-secondary mb-0">Disponibilidad, asignación y avance de descargas</p>
+          <p className="text-secondary mb-0">Cada llegada, incluso si es anticipada, entra en la cola y conserva su prioridad. El motor asigna automáticamente la bahía compatible.</p>
         </div>
         <button type="button" className="btn btn-outline-primary" disabled={actualizando} onClick={() => void actualizarTablero()}>
           {actualizando ? 'Actualizando...' : 'Actualizar'}
@@ -141,14 +135,6 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
           const asignado = gateway.pedidoAsignado;
           const descarga = descargas.find((item) => item.gatewayId._id === gateway._id);
           const clave = String(gateway._id);
-          const pedidosElegibles = pedidos.filter((pedido) =>
-            ['ANTICIPADO', 'A TIEMPO', 'TARDÍO'].includes(pedido.estado) &&
-            pedido.tipoProducto === gateway.tipoCargaPermitida &&
-            !pedido.gatewayId
-          );
-          const pedidoSeleccionadoDisponible = pedidosElegibles.some(
-            (pedido) => pedido._id === pedidoPorGateway[gateway._id]
-          );
           return (
             <article className={`gateway-card ${claseEstado[gateway.estado]}`} key={gateway._id}>
               <div className="gateway-card-head">
@@ -156,53 +142,30 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
                   <span className="gateway-number">{String(gateway.numeroGateway).padStart(2, '0')}</span>
                   <h3>Gateway {gateway.numeroGateway}</h3>
                 </div>
-                <span className="gateway-state">{gateway.estado}</span>
+                <span
+                  className="gateway-state"
+                  aria-label={gateway.estado === 'LIBRE' && asignado ? 'Listo para descarga' : gateway.estado}
+                  title={gateway.estado === 'LIBRE' && asignado ? 'Listo para descarga' : gateway.estado}
+                >
+                  {gateway.estado === 'LIBRE' && asignado ? 'LISTO' : gateway.estado}
+                </span>
               </div>
               <p className="gateway-cargo">Carga permitida: <strong>{gateway.tipoCargaPermitida}</strong></p>
 
-              {asignado ? (
+              {gateway.estado === 'OCUPADO' ? (
                 <div className="gateway-assignment">
-                  <span className="small text-uppercase fw-bold">Pedido asignado</span>
+                  <span className="small text-uppercase fw-bold">Descarga en curso</span>
+                  <strong>{descarga?.pedidoId.numeroPedido ?? asignado?.numeroPedido ?? 'Pedido en proceso'}</strong>
+                  {asignado && <span>{asignado.tipoProducto} · {asignado.estado}</span>}
+                </div>
+              ) : asignado ? (
+                <div className="gateway-assignment">
+                  <span className="small text-uppercase fw-bold">Asignado automáticamente · listo para iniciar</span>
                   <strong>{asignado.numeroPedido}</strong>
                   <span>{asignado.tipoProducto} · {asignado.estado}</span>
                 </div>
-              ) : gateway.estado === 'OCUPADO' ? (
-                <div className="gateway-assignment">
-                  <span className="small text-uppercase fw-bold">Descarga en curso</span>
-                  <strong>{descarga?.pedidoId.numeroPedido ?? 'Pedido en proceso'}</strong>
-                </div>
               ) : (
                 <div className="gateway-assignment gateway-empty">Sin pedido asignado</div>
-              )}
-
-              {puedeOperar && gateway.estado === 'LIBRE' && pedidosElegibles.length > 0 && (
-                <div className="gateway-queue-entry">
-                  <label className="form-label small mb-1" htmlFor={`pedido-${gateway._id}`}>Pedido elegible</label>
-                  <select
-                    id={`pedido-${gateway._id}`}
-                    className="form-select form-select-sm"
-                    value={pedidoPorGateway[gateway._id] ?? ''}
-                    onChange={(event) => setPedidoPorGateway((actual) => ({ ...actual, [gateway._id]: event.target.value }))}
-                  >
-                    <option value="">Seleccionar pedido</option>
-                    {pedidosElegibles.map((pedido) => (
-                      <option key={pedido._id} value={pedido._id}>
-                        {pedido.numeroPedido} · {pedido.estado}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary w-100 mt-2"
-                    disabled={!pedidoSeleccionadoDisponible || procesando === `cola-${gateway._id}`}
-                    onClick={() => void ejecutar(`cola-${gateway._id}`, async () => {
-                      await encolarPedido(pedidoPorGateway[gateway._id]);
-                      setPedidoPorGateway((actual) => ({ ...actual, [gateway._id]: '' }));
-                    })}
-                  >
-                    {procesando === `cola-${gateway._id}` ? 'Encolando...' : 'Agregar a cola priorizada'}
-                  </button>
-                </div>
               )}
 
               {puedeOperar && gateway.estado === 'LIBRE' && asignado && (
@@ -280,7 +243,7 @@ export default function GatewaysPanel({ puedeAdministrar, puedeOperar }: Gateway
         <div className="d-flex align-items-center justify-content-between gap-3 mb-3">
           <div>
             <h3 className="h5 mb-1">Cola de prioridad</h3>
-            <p className="small text-secondary mb-0">Ordenada por prioridad calculada: puntualidad, hora programada y aging.</p>
+            <p className="small text-secondary mb-0">Todos los pedidos se incorporan al registrar su llegada y se asignan por prioridad y compatibilidad.</p>
           </div>
           <span className="badge text-bg-secondary">{cola.length} en espera</span>
         </div>
