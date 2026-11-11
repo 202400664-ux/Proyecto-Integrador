@@ -2,16 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { jwtDecode } from 'jwt-decode';
-
-interface DecodedToken {
-  id: string;
-  email: string;
-  rol: 'administrador' | 'coordinador' | 'operador';
-  exp: number;
-}
-
-const ROLES_VALIDOS: DecodedToken['rol'][] = ['administrador', 'coordinador', 'operador'];
+import { leerSesionDeToken } from './dashboard/permisos';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -25,6 +16,8 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    sessionStorage.removeItem('mfaTempToken');
+    sessionStorage.removeItem('mfaSetupRequired');
 
     try {
       const response = await fetch('http://localhost:4000/api/auth/login', {
@@ -41,10 +34,24 @@ export default function LoginPage() {
         throw new Error(data.mensaje || 'Error al iniciar sesión');
       }
 
+      if (data.mfaRequired === true) {
+        if (typeof data.tempToken !== 'string') {
+          throw new Error('El servidor no devolvió un token temporal de MFA');
+        }
+        localStorage.removeItem('token');
+        sessionStorage.setItem('mfaTempToken', data.tempToken);
+        sessionStorage.setItem('mfaSetupRequired', String(data.mfaSetupRequired === true));
+        router.replace('/login/mfa');
+        return;
+      }
+
+      if (typeof data.token !== 'string') {
+        throw new Error('El servidor no devolvió un token de sesión');
+      }
+
       // Decodificar y validar el JWT antes de persistir la sesión.
-      const decoded: DecodedToken = jwtDecode(data.token);
-      if (!ROLES_VALIDOS.includes(decoded.rol)) {
-        throw new Error('El rol recibido no es válido');
+      if (!leerSesionDeToken(data.token)) {
+        throw new Error('La sesión recibida no es válida');
       }
 
       localStorage.setItem('token', data.token);
@@ -54,6 +61,8 @@ export default function LoginPage() {
       router.replace('/dashboard');
     } catch (err: unknown) {
       localStorage.removeItem('token');
+      sessionStorage.removeItem('mfaTempToken');
+      sessionStorage.removeItem('mfaSetupRequired');
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
     } finally {
       setLoading(false);

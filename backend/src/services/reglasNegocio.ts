@@ -72,19 +72,6 @@ export function validarCompatibilidadBahia(bahia: BahiaEvaluada, tipoCarga: Tipo
     : tipoCarga === 'general';
 }
 
-/**
- * HU-02 (escenario 2): un pedido ANTICIPADO permanece en garita sin gateway
- * hasta que inicia su ventana; los demás entran a la cola de inmediato.
- */
-export function puedeIngresarACola(
-  clasificacion: ClasificacionPuntualidad,
-  inicioVentana: Date | string,
-  ahora: Date | string = new Date()
-): boolean {
-  if (clasificacion !== 'ANTICIPADO') return true;
-  return new Date(ahora).getTime() >= new Date(inicioVentana).getTime();
-}
-
 /** RN-01: formato del número de pedido correlativo PED-EQUI##-#########. */
 export function formatearNumeroPedido(equipo: number, correlativo: number): string {
   if (!Number.isInteger(equipo) || equipo < 1 || equipo > 99) {

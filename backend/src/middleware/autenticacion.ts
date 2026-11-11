@@ -1,10 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import type { RoleName } from '../models/Role.js';
 
 export interface UsuarioAutenticado {
   id: string;
-  rol: RoleName;
+  rol: string;
   nombreCompleto: string;
 }
 
@@ -28,25 +27,21 @@ export const autenticar = (req: Request, res: Response, next: NextFunction): voi
 
   try {
     const payload = jwt.verify(token, secret);
+    if (typeof payload !== 'string' && payload.type === 'MFA_TEMP') {
+      res.status(403).json({ mensaje: 'El token temporal MFA no permite acceder a rutas operativas' });
+      return;
+    }
     if (typeof payload === 'string' || !payload.id || !payload.rol) {
       res.status(401).json({ mensaje: 'Token de sesión inválido' });
       return;
     }
     req.usuario = {
       id: String(payload.id),
-      rol: payload.rol as RoleName,
+      rol: String(payload.rol),
       nombreCompleto: String(payload.nombreCompleto || payload.email || 'Usuario'),
     };
     next();
   } catch {
     res.status(401).json({ mensaje: 'La sesión expiró o no es válida' });
   }
-};
-
-export const requiereRol = (...roles: RoleName[]) => (req: Request, res: Response, next: NextFunction): void => {
-  if (!req.usuario || !roles.includes(req.usuario.rol)) {
-    res.status(403).json({ mensaje: 'No tiene permiso para realizar esta operación' });
-    return;
-  }
-  next();
 };

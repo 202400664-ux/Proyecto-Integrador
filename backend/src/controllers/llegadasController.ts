@@ -4,7 +4,7 @@ import { Parametro } from '../models/Parametro.js';
 import { registrarAuditoria } from './auditoriaController.js';
 import { encolarPedido } from '../services/colaPrioridad.js';
 import { registrarEvento } from '../services/eventos.js';
-import { evaluarTolerancia, puedeIngresarACola, TOLERANCIAS_POR_DEFECTO } from '../services/reglasNegocio.js';
+import { evaluarTolerancia, TOLERANCIAS_POR_DEFECTO } from '../services/reglasNegocio.js';
 
 /** Lee un parámetro numérico de tolerancia; si no existe, usa el valor por defecto. */
 async function obtenerToleranciaMinutos(clave: string, porDefecto: number): Promise<number> {
@@ -94,11 +94,7 @@ export const registrarLlegada = async (req: Request, res: Response): Promise<voi
 
     let advertenciaCola: string | undefined;
     try {
-      // HU-02 (escenario 2): un pedido ANTICIPADO espera en garita sin gateway
-      // hasta que inicia su ventana; la cola lo libera en ese momento.
-      if (puedeIngresarACola(nuevoEstado, pedido.inicioVentana, fechaLlegadaReal)) {
-        await encolarPedido(String(pedido._id), { id: autenticado.id, nombreCompleto: actor });
-      }
+      await encolarPedido(String(pedido._id), { id: autenticado.id, nombreCompleto: actor });
     } catch (error) {
       console.error('No se pudo procesar el pedido en la cola de gateways:', error);
       advertenciaCola = 'El arribo quedó registrado, pero no se pudo procesar la asignación automática en la cola.';

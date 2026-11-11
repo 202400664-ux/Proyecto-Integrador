@@ -39,7 +39,7 @@ export const listarGateways = async (_req: Request, res: Response): Promise<void
     const gateways = await Gateway.find({ activo: true }).sort({ numeroGateway: 1 }).lean();
     const pedidosAsignados = await Pedido.find({
       activo: true,
-      estado: { $in: ['GATEWAY_ASIGNADO', 'DESCARGANDO'] },
+      estado: { $in: ['GATEWAY ASIGNADO', 'DESCARGANDO'] },
     }).select('numeroPedido tipoProducto estado gatewayId').lean();
     const porGateway = new Map(pedidosAsignados.map((pedido) => [String(pedido.gatewayId), pedido]));
 
@@ -179,8 +179,8 @@ export const inactivarGateway = async (req: Request, res: Response): Promise<voi
     const usuario = actor.nombreCompleto;
     if (gateway.pedidoAsignadoId) {
       const pedidoDevueltoACola = await Pedido.findOneAndUpdate(
-        { _id: gateway.pedidoAsignadoId, gatewayId: gateway._id, estado: 'GATEWAY_ASIGNADO', activo: true },
-        { $set: { estado: 'EN_COLA', usuarioActualizacion: usuario }, $unset: { gatewayId: 1 } },
+        { _id: gateway.pedidoAsignadoId, gatewayId: gateway._id, estado: 'GATEWAY ASIGNADO', activo: true },
+        { $set: { estado: 'EN COLA', usuarioActualizacion: usuario }, $unset: { gatewayId: 1 } },
         { returnDocument: 'after' }
       );
       if (!pedidoDevueltoACola) {
