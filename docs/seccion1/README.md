@@ -8,9 +8,9 @@ La Sección 1 consolidada se encuentra en el informe técnico:
 
 | Componente | Contenido |
 |---|---|
-| Project Charter | Objetivo, alcance, participantes, hitos, presupuesto, supuestos y criterios de éxito |
-| Diagrama de Ishikawa | Causas de congestión y asignación ineficiente relacionadas con métodos, personas, tecnología, datos, infraestructura y gestión |
-| Modelo BPMN TO-BE | Flujo de recepción, clasificación, asignación y descarga con los actores del sistema |
+| Project Charter | [project_charter.md](project_charter.md): objetivo, alcance, participantes, presupuesto y criterios de éxito |
+| Diagrama de Ishikawa | [diagrama_ishikawa.png](diagrama_ishikawa.png): causas de congestión y asignación ineficiente |
+| Modelo BPMN TO-BE | [modelo_bpmn_to_be.png](modelo_bpmn_to_be.png): flujo de recepción, clasificación, asignación y descarga |
 | Factibilidad técnica | Infraestructura, rendimiento, pruebas y condiciones técnicas |
 | Factibilidad económica | Costos, beneficios, VAN, TIR, ROI y punto de equilibrio |
 | Factibilidad operativa | Capacitación, adopción, soporte, cambio de procesos y UAT |
